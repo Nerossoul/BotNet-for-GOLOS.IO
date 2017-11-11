@@ -16,7 +16,7 @@ class GolosUser
     @gests = 0.0
     @voting_power = 0.0
     puts "Создаем пользователя #{user_name}"
-    get_user_info
+    #get_user_info
     end
 
   def get_user_info
