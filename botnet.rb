@@ -68,9 +68,11 @@ class BotNet
 
   def get_account_history_max_number(user_name)
     api = Radiator::Api.new(chain: :golos, url: 'https://ws.golos.io')
+    puts "geting account history max number"
     response = api.get_account_history(user_name, 800_000_000_000, 0)
     max_number = response['result'][0][0]
     sleep(1)
+    puts "#{user_name} account history max number is #{max_number}"
     return max_number
   end
 
@@ -79,22 +81,31 @@ class BotNet
     puts transaction_data
     tx.operations << transaction_data
     transaction_signed = false
+    retry_count = 0
+    retry_delay = 6
     while transaction_signed != true do
       begin
       response = tx.process(true)
-      rescue
+      rescue Exception => e
+      puts e.message.red
       puts "its a error here, but im trying again".red
+      sleep(15)
       response = tx.process(true)
       end
       #puts JSON.pretty_generate(response).brown
-      if response['error'] != nil
+      if (response['error'] != nil && retry_count < 11)
         puts response['error']['message'].red
-        puts "retry in 6 seconds".red
-        sleep(6)
+        puts "retry in #{retry_delay} seconds".red
+        sleep(retry_delay)
+        retry_count = retry_count + 1
+        retry_delay = retry_delay + 30
       elsif response['result'] != nil
         puts "Success".green
         puts JSON.pretty_generate(response['result']).green
         transaction_signed = true
+      else
+        puts "Transaction ABORTED #{response['error']['message']}"
+        # todo puts this error message to error_log file
       end
     end
   end
@@ -156,7 +167,6 @@ class BotNet
     parent_author = 'golos.loto'
     parent_author_lust_post_data = get_lust_post_data(parent_author)
     parent_permlink = parent_author_lust_post_data['op'][1]['permlink']
-    parent_author_lust_post_data = nil
     title = ''
     json_metadata = ''
     @users.each do |user|
@@ -177,28 +187,129 @@ class BotNet
     end
   end
 
+  def play_moment_loto
+    parent_author = 'momentloto'
+    parent_author_lust_post_data = get_lust_post_data(parent_author)
+    parent_permlink = parent_author_lust_post_data['op'][1]['permlink']
+    @users.each do |user|
+      get_permission_to_run_thead
+      Thread::abort_on_exception = true
+      Thread.new(user.user_name, user.post_key) do |user_name, post_key|
+        vote = create_vote_data(user_name, parent_author, parent_permlink, 100)
+        puts "#{user_name} vote for @#{parent_author}/#{parent_permlink}".blue
+        sign_transaction(vote, post_key)
+      end
+    end
+  end
+
   def generate_golos_loto_ticket
     OFTEN_LOTTERY_NUMBERS.sample(5).sort.join(' ')
   end
 
-  def lunch_playing_golos_loto
+  def lunch_playing_lotos
     #it is Krasnoyarsk time
-    lunch_time = [[17,20],[20,20],[23,20],[2,20],[5,20]]
+    golos_loto_lunch_time = [[17,20],[20,20],[23,20],[2,20],[5,20]]
+    #momentloto_lunch_time = [[6:00], [11:00], [14:00], [17:00], [21:00], [02:00]]
     loop do
       t = Time.now
-      puts "#{t.hour}:#{t.min}"
-      lunch_time.each do |time_x|
+      puts "#{t.hour}:#{t.min} waiting for next lunch"
+      golos_loto_lunch_time.each do |time_x|
         if (t.hour == time_x[0] and t.min == time_x[1])
           puts "RUN IT NOW".red
           play_golos_loto
-          3600.times do
+          2.times do
             t = Time.now
             puts "#{t.hour}:#{t.min}"
-            sleep(1)
+            sleep(32)
           end
         end
       end
+      sleep(59)
+    end
+  end
+
+  def get_user_vote_history(user_name, limit)
+    user_vote_history = []
+    max_number = get_account_history_max_number(user_name)
+    limit_response = 1999
+    api = Radiator::Api.new(chain: :golos, url: 'https://ws.golos.io')
+    while max_number > 0 do
+      puts "getting #{user_name} lust #{limit} upvotes"
+      limit_response = max_number - 1 if limit_response > max_number
+      response = api.get_account_history(user_name, max_number, limit_response)
+      #puts JSON.pretty_generate(response)
+      response['result'].reverse_each do |result|
+        if result[1]['op'][0] == 'vote' then
+          if result[1]['op'][1]['voter'] == user_name then
+            user_vote_history << result[1]
+            if user_vote_history.size == limit then
+              max_number = 0
+              break
+            end
+          end
+        end
+      end
+      max_number = max_number - 2000
       sleep(1)
+    end
+    puts "*********************"
+    return user_vote_history
+  end
+
+  def did_i_vote_here(user_name, author, permlink)
+    # todo
+  end
+
+  def get_repost_history(user_name, period_hours)
+    user_reblog_history = []
+    max_number = get_account_history_max_number(user_name)
+    limit_response = 1999
+    api = Radiator::Api.new(chain: :golos, url: 'https://ws.golos.io')
+    while max_number > 0 do
+      limit_response = max_number - 1 if limit_response > max_number
+      puts "geting #{user_name} reblogs"
+      response = api.get_account_history(user_name, max_number, limit_response)
+      #puts JSON.pretty_generate(response)
+      response['result'].reverse_each do |result|
+        if result[1]['op'][0] == 'custom_json' then
+          #if result[1]['op'][1]['json'][0] == '\"reblog\"' then
+            user_reblog_history << result[1]
+            # todo refactor timestamp conversion
+            puts result[1]['timestamp']
+            timestamp = result[1]['timestamp'].split('T')
+            reblog_date = timestamp[0].split('-')
+            reblog_time = timestamp[1].split(':')
+            timestamp_converted = Time.new(reblog_date[0], reblog_date[1], reblog_date[2], reblog_time[0], reblog_time[1], reblog_time[2])
+            puts timestamp_converted
+          #end of time stamp conversion
+            if user_reblog_history.size == period_hours then
+              max_number = 0
+              break
+            end
+          #end
+        end
+      end
+      max_number = 0 # max_number - 2000
+      sleep(1)
+    end
+    puts "*********************"
+    return user_reblog_history
+  end
+
+  def folow_vote_history(user_vote_history) #todo try a
+    user_vote_history.each do |vote_data_from_history|
+      puts vote_data_from_history['op'][1]['author']
+      puts vote_data_from_history['op'][1]['permlink']
+      puts "******"
+    # @users.each do |user|
+      #  get_permission_to_run_thead
+      #  Thread::abort_on_exception = true
+      #  Thread.new(user.user_name, user.post_key) do |user_name, post_key|
+      #    vote = create_vote_data(user_name, parent_author, parent_permlink, 100)
+      #    puts "#{user_name} vote for @#{parent_author}/#{parent_permlink}".blue
+          #sign_transaction(vote, post_key)
+      #  end
+      #end
     end
   end
 end #class end
