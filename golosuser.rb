@@ -15,7 +15,7 @@ class GolosUser
     @gbg = 0.0
     @gests = 0.0
     @voting_power = 0.0
-    puts "Создаем пользователя #{user_name}"
+    puts "Creating user #{user_name.brown}"
     #get_user_info
     end
 
@@ -23,19 +23,19 @@ class GolosUser
     api = Radiator::Api.new(chain: :golos, url: 'https://ws.golos.io')
     response = api.get_accounts([@user_name])
     golos_power = response['result'][0]['vesting_shares'].split(' ')
-    puts response['result'][0]['name']
+    #puts response['result'][0]['name']
     @golos = response['result'][0]['balance']
     @golos_power = (golos_power[0].to_f * get_steem_per_mvests / 1_000_000)
     @gbg = response['result'][0]['sbd_balance']
     @gests = response['result'][0]['vesting_shares']
     @voting_power = response['result'][0]['voting_power'] / 100.0
-    puts '*******************************************'
-    puts 'Golos: ' + @golos.to_s
-    puts 'Golos Power: ' + @golos_power.to_s
-    puts 'Golos Gold: ' + @gbg.to_s
-    puts 'Gests: ' + @gests.to_s
-    puts 'Voting_power: ' + @voting_power.to_s
-    puts '*******************************************'
+    #puts '*******************************************'
+    #puts 'Golos: ' + @golos.to_s
+    #puts 'Golos Power: ' + @golos_power.to_s
+    #puts 'Golos Gold: ' + @gbg.to_s
+    #puts 'Gests: ' + @gests.to_s
+    #puts 'Voting_power: ' + @voting_power.to_s
+    #puts '*******************************************'
   end
 
   def get_steem_per_mvests
