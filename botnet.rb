@@ -90,23 +90,24 @@ class BotNet
       response = tx.process(true)
       rescue Exception => e
       puts e.message.red
-      puts "its a error here, but im trying again in 15 sec".red
+      puts "its a error here, but im trying again in 15 sec".red.reverse_color
       sleep(15)
       response = tx.process(true)
       end
       #puts JSON.pretty_generate(response).brown
       if (response['error'] != nil && retry_count < 11)
+        retry_count = retry_count + 1
+        puts "We 've got a ERROR MESSAGE NUMBER #{retry_count}'".red.reverse_color
         puts response['error']['message'].red
         puts "retry in #{retry_delay} seconds".red
         sleep(retry_delay)
-        retry_count = retry_count + 1
         retry_delay = retry_delay + 30
       elsif response['result'] != nil
         puts "Success".green
         puts JSON.pretty_generate(response['result']).green
         transaction_signed = true
       else
-        puts "Transaction ABORTED #{response['error']['message']}"
+        puts "Transaction ABORTED #{response['error']['message']}".red.reverse_color
         # todo puts this error message to error_log file
       end
     end
@@ -209,7 +210,7 @@ class BotNet
 
   def launch_playing_lotos #now it launchs golos.loto only but soon it will play momentloto
     #it is Krasnoyarsk time
-    golos_loto_lunch_time = [[17,20],[20,20],[23,20],[2,20],[5,20]]
+    golos_loto_lunch_time = [[17,20],[20,20],[23,20],[2,20],[7,5]]
     #momentloto_lunch_time = [[6:00], [11:00], [14:00], [17:00], [21:00], [02:00]]
     puts
     loop do
@@ -295,7 +296,7 @@ class BotNet
 
   def get_post_information(author, permlink)
     api = Radiator::Api.new(chain: :golos, url: 'https://ws.golos.io')
-    print "Getting pots information for #{author.brown}/#{permlink.brown} "
+    print "Getting posts information for #{author.brown}/#{permlink.brown} "
     response = api.get_content(author, permlink)
     #puts JSON.pretty_generate(response)
     post_information = {
@@ -339,19 +340,34 @@ class BotNet
           if post_been_voted then
             puts "#{user.user_name.upcase} already voted for @#{author}/#{permlink}".blue
           else
-            user.get_user_info
-            if user.voting_power < 75 then
-              puts "#{user.user_name.brown} Voting Power #{user.voting_power.to_s.red} go to sleep".reverse_color
+            if user.till_what_time_to_sleep > Time.now.utc then
+              puts "#{user.user_name.brown} sleeping till #{user.till_what_time_to_sleep}".reverse_color
             else
-              puts "#{user.user_name.brown} Voting Power #{user.voting_power.to_s.green}".reverse_color
-              vote = create_vote_data(user.user_name, author, permlink, 10000)
-              puts
-              puts "#{user.user_name.brown} vote for @#{author}/#{permlink}."
-              sign_transaction(vote, user.post_key)
+              user.get_user_info
+              if user.voting_power < 77 then
+                puts "#{user.user_name.brown} Voting Power #{user.voting_power.to_s.red} go to sleep".reverse_color
+                user.till_what_time_to_sleep = Time.now.utc + 60*60*23
+              else
+                puts "#{user.user_name.brown} Voting Power #{user.voting_power.to_s.green}".reverse_color
+                vote = create_vote_data(user.user_name, author, permlink, 10000)
+                puts
+                puts "#{user.user_name.brown} vote for @#{author}/#{permlink}."
+                sign_transaction(vote, user.post_key)
+              end
             end
           end
         end #end of Thread
       end #end users.each
+      sleeping_users_count = 0
+      @users.each do |user|
+          sleeping_users_count = sleeping_users_count + 1 if user.till_what_time_to_sleep > Time.now.utc
+      end
+      if sleeping_users_count == @users.size then
+        puts "Everybody are sleeping NOW #{Time.now.utc}".reverse_color
+      else
+        puts "25 seconds interval starts #{Time.now.utc}".reverse_color
+        sleep(25)
+      end
     end
   end
 
