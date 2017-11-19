@@ -1,4 +1,4 @@
-# start botnet and go to rest
+# start playing golos loto
 require_relative 'botnet.rb'
 require_relative 'golosuser.rb'
 require_relative 'stringformat.rb'

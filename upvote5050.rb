@@ -1,4 +1,4 @@
-# start botnet and go to rest
+# start upvotin for upvote50-50 reblogs/
 require_relative 'botnet.rb'
 require_relative 'golosuser.rb'
 require_relative 'stringformat.rb'
@@ -13,7 +13,7 @@ loop do
     if (t.hour == upvoting_upvote50_50_lunch_time[0] and t.min == upvoting_upvote50_50_lunch_time[1])
       puts
       puts "RUN IT NOW".red
-      user_reblog_history = botnet_commander.get_reblog_history('upvote50-50', 48)
+      user_reblog_history = botnet_commander.get_reblog_history('upvote50-50', FIRST_PAYOUT_PERIOD + 24)
       upvote_list = botnet_commander.create_upvote_list_from_reblog_history(user_reblog_history)
       upvote_list.each_with_index { |elem, num| puts "#{num+1}: #{elem[:pending_payout_value].to_s.green} => #{elem[:author].brown}/#{elem[:permlink].brown} "}
       botnet_commander.vote_by_each_user_for_upvote_list(upvote_list)

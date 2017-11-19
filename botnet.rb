@@ -78,36 +78,45 @@ class BotNet
     return max_number
   end
 
-  def sign_transaction(transaction_data, wif_key)
+  def sign_transaction(transaction_data, wif_key, user)
     tx = Radiator::Transaction.new(wif: wif_key, chain: :golos, url: 'https://ws.golos.io')
-    puts transaction_data
+    puts "\n\r#{user.user_name.brown} sing transaction --> #{transaction_data}".green
     tx.operations << transaction_data
     transaction_signed = false
     retry_count = 0
     retry_delay = 6
+    #check signing_transaction_now by this user/
+    while user.signing_transaction_now == true do
+      #puts "\n\r#{user.user_name.brown} signing another transaction now...WAITING 4 seconds"
+      sleep(4)
+    end
+    user.signing_transaction_now = true
     while transaction_signed != true do
       begin
       response = tx.process(true)
       rescue Exception => e
       puts e.message.red
-      puts "its a error here, but im trying again in 15 sec".red.reverse_color
+      puts "\n\rit\'s a error here, but im trying again in 15 sec".red.reverse_color
       sleep(15)
       response = tx.process(true)
       end
       #puts JSON.pretty_generate(response).brown
-      if (response['error'] != nil && retry_count < 11)
+      if (response['error'] != nil && retry_count < 10)
         retry_count = retry_count + 1
-        puts "We 've got a ERROR MESSAGE NUMBER #{retry_count}'".red.reverse_color
+        puts "\n\rWe 've got a ERROR MESSAGE NUMBER #{retry_count}'".red.reverse_color
         puts response['error']['message'].red
-        puts "retry in #{retry_delay} seconds".red
+        puts "\n\rretry in #{retry_delay} seconds".red
         sleep(retry_delay)
-        retry_delay = retry_delay + 30
       elsif response['result'] != nil
-        puts "Success".green
+        sleep(4)
+        user.signing_transaction_now = false
+        puts "\n\r#{user.user_name.upcase} success at #{Time.now.utc}".green
         puts JSON.pretty_generate(response['result']).green
         transaction_signed = true
       else
-        puts "Transaction ABORTED #{response['error']['message']}".red.reverse_color
+        sleep(4)
+        user.signing_transaction_now = false
+        puts "\n\rTransaction ABORTED #{response['error']['message']}".red.reverse_color
         # todo puts this error message to error_log file
       end
     end
@@ -147,9 +156,9 @@ class BotNet
 
   def get_permission_to_run_thead
     working_thread_max = MAX_THREADS
-    print 'checking permission to go on'
+    print "\n\rchecking permission to go on"
     while Thread.list.size >= working_thread_max do
-      puts "Всего потоков: #{Thread.list.size - 1} / MAX:#{MAX_THREADS - 1}".red
+      puts "\n\rВсего потоков: #{Thread.list.size - 1} / MAX:#{MAX_THREADS - 1}".red
       sleep(1)
     end
     puts " OK".green.bold
@@ -157,7 +166,7 @@ class BotNet
 
   def whait_while_all_thread_are_done
     while Thread.list.size > 1 do
-      puts "Ожидаем завершения потоков: #{Thread.list.size - 1} / #{MAX_THREADS - 1}"
+      puts "\n\rОжидаем завершения потоков: #{Thread.list.size - 1} / #{MAX_THREADS - 1}"
       #Thread.list.each {|t| puts t}
       sleep(3)
     end
@@ -175,16 +184,14 @@ class BotNet
     @users.each do |user|
       get_permission_to_run_thead
       Thread::abort_on_exception = true
-      Thread.new(user.user_name, user.post_key) do |user_name, post_key|
+      Thread.new(user) do |user_of_this_thread|
         body = generate_golos_loto_ticket
-        vote = create_vote_data(user_name, parent_author, parent_permlink, 10000)
-        comment = create_comment_data(parent_permlink, user_name, title, body, json_metadata, parent_author)
-        puts "#{user_name.brown} vote for @#{parent_author}/#{parent_permlink}".blue
-        sign_transaction(vote, post_key)
-        puts "#{user_name.brown} wiat 6 seconds between queries to blockchain".blue
-        sleep(6)
-        puts "#{user_name.brown} play loto @#{parent_author}/#{parent_permlink} post ticket numbers: #{body}".blue
-        sign_transaction(comment, post_key)
+        vote = create_vote_data(user_of_this_thread.user_name, parent_author, parent_permlink, 10000)
+        comment = create_comment_data(parent_permlink, user_of_this_thread.user_name, title, body, json_metadata, parent_author)
+        puts "\n\r#{user_of_this_thread.user_name.brown} vote for @#{parent_author}/#{parent_permlink}".blue
+        sign_transaction(vote, user_of_this_thread.post_key, user_of_this_thread)
+        puts "\n\r#{user_of_this_thread.user_name.brown} play loto @#{parent_author}/#{parent_permlink} post ticket numbers: #{body}".blue
+        sign_transaction(comment, user_of_this_thread.post_key, user_of_this_thread)
       end
     end
   end
@@ -196,10 +203,10 @@ class BotNet
     @users.each do |user|
       get_permission_to_run_thead
       Thread::abort_on_exception = true
-      Thread.new(user.user_name, user.post_key) do |user_name, post_key|
-        vote = create_vote_data(user_name, parent_author, parent_permlink, 100)
-        puts "#{user_name.brown} vote for @#{parent_author}/#{parent_permlink}".blue
-        sign_transaction(vote, post_key)
+      Thread.new(user) do |user_of_this_thread|
+        vote = create_vote_data(user_of_this_thread.user_name, parent_author, parent_permlink, 100)
+        puts "\n\r#{user_of_this_thread.user_name.brown} vote for @#{parent_author}/#{parent_permlink}".blue
+        sign_transaction(vote, user_of_this_thread.post_key, user_of_this_thread)
       end
     end
   end
@@ -218,12 +225,11 @@ class BotNet
       print "."
       golos_loto_lunch_time.each do |time_x|
         if (t.hour == time_x[0] and t.min == time_x[1])
-          puts
-          puts "RUN IT NOW".red
+          puts "\n\rRUN IT NOW".red
           play_golos_loto
             sleep(65)
             t = Time.now
-            puts "All users begin to play loto at #{t.hour}:#{t.min}. Waiting for next lunch".reverse_color
+            puts "\n\rAll users begin to play loto at #{t.hour}:#{t.min}. Waiting for next lunch".reverse_color
         end
       end
       sleep(59)
@@ -236,7 +242,7 @@ class BotNet
     limit_response = 1999
     api = Radiator::Api.new(chain: :golos, url: 'https://ws.golos.io')
     while max_number > 0 do
-      puts "getting #{user_name.brown} lust #{limit} upvotes"
+      puts "\n\rgetting #{user_name.brown} lust #{limit} upvotes"
       limit_response = max_number - 1 if limit_response > max_number
       response = api.get_account_history(user_name, max_number, limit_response)
       #puts JSON.pretty_generate(response)
@@ -254,7 +260,7 @@ class BotNet
       max_number = max_number - 2000
       sleep(1)
     end
-    puts "*********************"
+    puts "\n\r*********************"
     return user_vote_history
   end
 
@@ -296,7 +302,7 @@ class BotNet
 
   def get_post_information(author, permlink)
     api = Radiator::Api.new(chain: :golos, url: 'https://ws.golos.io')
-    print "Getting posts information for #{author.brown}/#{permlink.brown} "
+    print "Getting post information for #{author.brown}/#{permlink.brown} "
     response = api.get_content(author, permlink)
     #puts JSON.pretty_generate(response)
     post_information = {
@@ -329,8 +335,8 @@ class BotNet
 
   def vote_by_each_user_for_upvote_list(upvote_list)
     upvote_list.each do |post|
-      puts "************************"
-      puts "Upvoting for #{post[:pending_payout_value].to_s.green} => #{post[:author].brown}/#{post[:permlink].brown}".reverse_color
+      puts "\n\r************************"
+      puts "\n\rUpvoting for #{post[:pending_payout_value].to_s.green} => #{post[:author].brown}/#{post[:permlink].brown}".reverse_color
       @users.each do |user|
         get_permission_to_run_thead
         Thread::abort_on_exception = true
@@ -338,21 +344,21 @@ class BotNet
           post_been_voted = false
           active_votes.each { |elem| post_been_voted = true if user.user_name == elem['voter'] }
           if post_been_voted then
-            puts "#{user.user_name.upcase} already voted for @#{author}/#{permlink}".blue
+            puts "\n\r#{user.user_name.upcase} already voted for @#{author}/#{permlink}".blue
           else
             if user.till_what_time_to_sleep > Time.now.utc then
-              puts "#{user.user_name.brown} sleeping till #{user.till_what_time_to_sleep}".reverse_color
+              puts "\n\r#{user.user_name.brown} sleeping till #{user.till_what_time_to_sleep}".reverse_color
             else
               user.get_user_info
-              if user.voting_power < 77 then
-                puts "#{user.user_name.brown} Voting Power #{user.voting_power.to_s.red} go to sleep".reverse_color
+              if user.future_voting_power < 77 then
+                puts "\n\r#{user.user_name.brown} Voting Power now #{user.voting_power.to_s.red}-->#{user.future_voting_power.to_s.red} go to sleep".reverse_color
                 user.till_what_time_to_sleep = Time.now.utc + 60*60*23
               else
-                puts "#{user.user_name.brown} Voting Power #{user.voting_power.to_s.green}".reverse_color
+                user.future_voting_power = user.future_voting_power - ((user.future_voting_power/100*0.5).round(2))
+                puts "\n\r#{user.user_name.brown} Voting Power now #{user.voting_power.to_s.green}-->#{user.future_voting_power.to_s.green}".reverse_color
                 vote = create_vote_data(user.user_name, author, permlink, 10000)
-                puts
-                puts "#{user.user_name.brown} vote for @#{author}/#{permlink}."
-                sign_transaction(vote, user.post_key)
+                puts "\n\r#{user.user_name.brown} vote for @#{author}/#{permlink}."
+                sign_transaction(vote, user.post_key, user)
               end
             end
           end
@@ -363,10 +369,9 @@ class BotNet
           sleeping_users_count = sleeping_users_count + 1 if user.till_what_time_to_sleep > Time.now.utc
       end
       if sleeping_users_count == @users.size then
-        puts "Everybody are sleeping NOW #{Time.now.utc}".reverse_color
+        puts "\n\rEverybody are sleeping NOW #{Time.now.utc}".reverse_color
       else
-        puts "25 seconds interval starts #{Time.now.utc}".reverse_color
-        sleep(25)
+        puts "\n\rStarting next post #{Time.now.utc}".reverse_color
       end
     end
   end

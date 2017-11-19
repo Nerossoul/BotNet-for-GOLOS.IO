@@ -5,20 +5,22 @@ class GolosUser
 
   attr_reader(:user_name, :post_key, :activ_key, :golos, :golos_power, :gbg,
               :gests, :voting_power)
-  attr_accessor(:till_what_time_to_sleep)
+  attr_accessor(:till_what_time_to_sleep, :signing_transaction_now, :future_voting_power)
 
   def initialize(user_name, post_key, activ_key)
     @user_name = user_name
     @post_key = post_key
     @activ_key = activ_key
     @till_what_time_to_sleep = Time.now.utc
+    @signing_transaction_now = false
     @golos = 0.0
     @golos_power = 0.0
     @gbg = 0.0
     @gests = 0.0
     @voting_power = 0.0
     puts "Creating user #{user_name.brown}"
-    #get_user_info
+    get_user_info
+    @future_voting_power = @voting_power
     end
 
   def get_user_info
