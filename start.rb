@@ -3,10 +3,13 @@ require_relative 'botnet.rb'
 require_relative 'golosuser.rb'
 require_relative 'stringformat.rb'
 
-bots = BotNet.new
+#bots = BotNet.new
 
-puts bots.users[0].voting_power
-puts bots.users[0].future_voting_power
-bots.users[0].future_voting_power = bots.users[0].future_voting_power - ((bots.users[0].future_voting_power/100*0.5).round(2))
-puts bots.users[0].voting_power
-puts bots.users[0].future_voting_power
+#api = Radiator::Api.new(chain: :golos, url: 'https://ws.golos.io')
+#response = api.get_accounts(["nerossoul"])
+#puts response['result'][0]['name']
+#puts JSON.pretty_generate(response)
+
+user = GolosUser.new('nerossoul', 'nil', 'nil')
+puts user.voting_power
+puts user.actual_voting_power

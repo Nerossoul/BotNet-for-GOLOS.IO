@@ -80,7 +80,6 @@ class BotNet
 
   def sign_transaction(transaction_data, wif_key, user)
     tx = Radiator::Transaction.new(wif: wif_key, chain: :golos, url: 'https://ws.golos.io')
-    puts "\n\r#{user.user_name.brown} sing transaction --> #{transaction_data}".green
     tx.operations << transaction_data
     transaction_signed = false
     retry_count = 0
@@ -91,15 +90,19 @@ class BotNet
       sleep(4)
     end
     user.signing_transaction_now = true
+    puts "\n\r#{user.user_name.brown} sing transaction --> #{transaction_data}".green
     while transaction_signed != true do
-      begin
-      response = tx.process(true)
-      rescue Exception => e
-      puts e.message.red
-      puts "\n\rit\'s a error here, but im trying again in 15 sec".red.reverse_color
-      sleep(15)
-      response = tx.process(true)
-      end
+        begin
+        response = tx.process(true)
+        rescue Exception => e
+        puts "ТУТ ИДЕТ ВСЕ СООБЩЕНИЕ ОШИБКИ ЭТОТ ТЕКСТ НАДО ОТПРАВИТЬ ИНХЕРИТЕ КАК ISSUE".red.reverse_color
+        puts e # e.message.red
+        print e.backtrace.join("\n")
+        puts "\n\r#{user.user_name.brown} got a error here. Try again in 15 sec".red.reverse_color
+        sleep(15)
+        response = {}
+        response['error'] = {'message' => "NO TRANSACTION TO BLOKCHAIN--==>#{e.message}<==--"}
+        end
       #puts JSON.pretty_generate(response).brown
       if (response['error'] != nil && retry_count < 10)
         retry_count = retry_count + 1
@@ -110,8 +113,9 @@ class BotNet
       elsif response['result'] != nil
         sleep(4)
         user.signing_transaction_now = false
-        puts "\n\r#{user.user_name.upcase} success at #{Time.now.utc}".green
-        puts JSON.pretty_generate(response['result']).green
+        puts "\n\r#{user.user_name.upcase} success sing transaction -->".green +
+        " #{transaction_data} at #{Time.now.utc}\n\r ".green +
+        " #{JSON.pretty_generate(response['result'])}".green
         transaction_signed = true
       else
         sleep(4)
@@ -156,23 +160,21 @@ class BotNet
 
   def get_permission_to_run_thead
     working_thread_max = MAX_THREADS
-    print "\n\rchecking permission to go on"
+    #print "\n\rchecking permission to go on"
     while Thread.list.size >= working_thread_max do
-      puts "\n\rВсего потоков: #{Thread.list.size - 1} / MAX:#{MAX_THREADS - 1}".red
+      puts "\n\rВсего потоков: #{Thread.list.size - 1} / MAX:#{MAX_THREADS}".red
       sleep(1)
     end
-    puts " OK".green.bold
+    #puts " OK".green.bold
   end
 
-  def whait_while_all_thread_are_done
+  def wait_while_all_threads_are_done
     while Thread.list.size > 1 do
-      puts "\n\rОжидаем завершения потоков: #{Thread.list.size - 1} / #{MAX_THREADS - 1}"
+      #puts "\n\rОжидаем завершения потоков: #{Thread.list.size - 1} / #{MAX_THREADS - 1}"
       #Thread.list.each {|t| puts t}
-      sleep(3)
+      sleep(5)
     end
-    puts "JOB WELL DONE, press ENTER"
-    good_bye_message = gets.chomp
-    puts good_bye_message
+    #puts "JOB WELL DONE"
   end
 
   def play_golos_loto
@@ -181,6 +183,7 @@ class BotNet
     parent_permlink = parent_author_lust_post_data['op'][1]['permlink']
     title = ''
     json_metadata = ''
+    post_information = get_post_information(parent_author, parent_permlink)
     @users.each do |user|
       get_permission_to_run_thead
       Thread::abort_on_exception = true
@@ -188,9 +191,15 @@ class BotNet
         body = generate_golos_loto_ticket
         vote = create_vote_data(user_of_this_thread.user_name, parent_author, parent_permlink, 10000)
         comment = create_comment_data(parent_permlink, user_of_this_thread.user_name, title, body, json_metadata, parent_author)
-        puts "\n\r#{user_of_this_thread.user_name.brown} vote for @#{parent_author}/#{parent_permlink}".blue
-        sign_transaction(vote, user_of_this_thread.post_key, user_of_this_thread)
-        puts "\n\r#{user_of_this_thread.user_name.brown} play loto @#{parent_author}/#{parent_permlink} post ticket numbers: #{body}".blue
+        post_been_voted = false
+        post_information[:active_votes].each do |elem|
+          post_been_voted = true if user_of_this_thread.user_name == elem['voter']
+        end
+        if post_been_voted then
+          puts "\n\r#{user_of_this_thread.user_name.upcase} already voted for @#{parent_author}/#{parent_permlink}".blue
+        else
+          sign_transaction(vote, user_of_this_thread.post_key, user_of_this_thread)
+        end
         sign_transaction(comment, user_of_this_thread.post_key, user_of_this_thread)
       end
     end
@@ -217,7 +226,7 @@ class BotNet
 
   def launch_playing_lotos #now it launchs golos.loto only but soon it will play momentloto
     #it is Krasnoyarsk time
-    golos_loto_lunch_time = [[17,20],[20,20],[23,20],[2,20],[7,5]]
+    golos_loto_lunch_time = [[17,20],[20,43],[23,20],[2,20],[7,0]]
     #momentloto_lunch_time = [[6:00], [11:00], [14:00], [17:00], [21:00], [02:00]]
     puts
     loop do
@@ -227,9 +236,9 @@ class BotNet
         if (t.hour == time_x[0] and t.min == time_x[1])
           puts "\n\rRUN IT NOW".red
           play_golos_loto
-            sleep(65)
+          wait_while_all_threads_are_done
             t = Time.now
-            puts "\n\rAll users begin to play loto at #{t.hour}:#{t.min}. Waiting for next lunch".reverse_color
+            puts "\n\rAll users finished playing loto at #{t.hour}:#{t.min}. Waiting for next lunch".reverse_color
         end
       end
       sleep(59)
@@ -276,7 +285,7 @@ class BotNet
     puts "geting #{user_name.brown} reblogs"
     while max_number > 0 do
       limit_response = max_number - 1 if limit_response > max_number
-      print "*"
+      print "."
       response = api.get_account_history(user_name, max_number, limit_response)
       response['result'].reverse_each do |result|
         if result[1]['op'][0] == 'custom_json' then
@@ -334,6 +343,10 @@ class BotNet
   end
 
   def vote_by_each_user_for_upvote_list(upvote_list)
+    @users.each do |user|
+    user.get_user_info
+    user.future_voting_power = user.actual_voting_power
+    end
     upvote_list.each do |post|
       puts "\n\r************************"
       puts "\n\rUpvoting for #{post[:pending_payout_value].to_s.green} => #{post[:author].brown}/#{post[:permlink].brown}".reverse_color
@@ -346,33 +359,16 @@ class BotNet
           if post_been_voted then
             puts "\n\r#{user.user_name.upcase} already voted for @#{author}/#{permlink}".blue
           else
-            if user.till_what_time_to_sleep > Time.now.utc then
-              puts "\n\r#{user.user_name.brown} sleeping till #{user.till_what_time_to_sleep}".reverse_color
-            else
-              user.get_user_info
-              if user.future_voting_power < 77 then
-                puts "\n\r#{user.user_name.brown} Voting Power now #{user.voting_power.to_s.red}-->#{user.future_voting_power.to_s.red} go to sleep".reverse_color
-                user.till_what_time_to_sleep = Time.now.utc + 60*60*23
-              else
-                user.future_voting_power = user.future_voting_power - ((user.future_voting_power/100*0.5).round(2))
-                puts "\n\r#{user.user_name.brown} Voting Power now #{user.voting_power.to_s.green}-->#{user.future_voting_power.to_s.green}".reverse_color
-                vote = create_vote_data(user.user_name, author, permlink, 10000)
-                puts "\n\r#{user.user_name.brown} vote for @#{author}/#{permlink}."
-                sign_transaction(vote, user.post_key, user)
-              end
+            if user.future_voting_power > 95 then
+              user.future_voting_power = user.future_voting_power - ((user.future_voting_power/100*0.5).round(2))
+              puts "\n\r#{user.user_name.brown} Voting Power now #{user.actual_voting_power.to_s.green}-->#{user.future_voting_power.to_s.green}".reverse_color
+              vote = create_vote_data(user.user_name, author, permlink, 10000)
+              # puts "\n\r#{user.user_name.brown} vote for @#{author}/#{permlink}."
+              sign_transaction(vote, user.post_key, user)
             end
           end
         end #end of Thread
       end #end users.each
-      sleeping_users_count = 0
-      @users.each do |user|
-          sleeping_users_count = sleeping_users_count + 1 if user.till_what_time_to_sleep > Time.now.utc
-      end
-      if sleeping_users_count == @users.size then
-        puts "\n\rEverybody are sleeping NOW #{Time.now.utc}".reverse_color
-      else
-        puts "\n\rStarting next post #{Time.now.utc}".reverse_color
-      end
     end
   end
 

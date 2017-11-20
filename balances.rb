@@ -8,7 +8,6 @@ gbg_sum = 0.0
 
 botnet_commander = BotNet.new
 botnet_commander.users.each do |user|
-  user.get_user_info
   puts user.user_name
   puts '*******************************************'
   puts 'Golos: ' + user.golos.to_s
@@ -21,6 +20,7 @@ botnet_commander.users.each do |user|
   golos_power_sum = golos_power_sum + user.golos_power
   gbg_sum = gbg_sum + user.gbg.split[0].to_f
 end
+puts "#{Time.now}"
 puts 'Golos sum: ' + golos_sum.to_s
 puts 'Golos Power sum: ' + golos_power_sum.to_s
 puts 'Golos Gold sum: ' + gbg_sum.to_s

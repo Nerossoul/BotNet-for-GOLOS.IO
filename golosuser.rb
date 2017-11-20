@@ -4,7 +4,7 @@ require 'json'
 class GolosUser
 
   attr_reader(:user_name, :post_key, :activ_key, :golos, :golos_power, :gbg,
-              :gests, :voting_power)
+              :gests, :voting_power , :last_vote_time, :actual_voting_power)
   attr_accessor(:till_what_time_to_sleep, :signing_transaction_now, :future_voting_power)
 
   def initialize(user_name, post_key, activ_key)
@@ -18,9 +18,20 @@ class GolosUser
     @gbg = 0.0
     @gests = 0.0
     @voting_power = 0.0
+    @last_vote_time = nil
+    @actual_voting_power = 0.0
     puts "Creating user #{user_name.brown}"
     get_user_info
     @future_voting_power = @voting_power
+    end
+
+    def get_actual_voting_power(voting_power, timestamp)
+      timestamp = timestamp.split('T')
+      timestamp_date_array = timestamp[0].split('-')
+      timestamp_time_array = timestamp[1].split(':')
+      timestamp_converted = Time.new(timestamp_date_array[0], timestamp_date_array[1], timestamp_date_array[2], timestamp_time_array[0], timestamp_time_array[1], timestamp_time_array[2], "+00:00")
+      actual_voting_power = voting_power + ((Time.now.utc - timestamp_converted.utc) / 60 * 20 / 24 / 60)
+      return actual_voting_power.round(2)
     end
 
   def get_user_info
@@ -33,6 +44,8 @@ class GolosUser
     @gbg = response['result'][0]['sbd_balance']
     @gests = response['result'][0]['vesting_shares']
     @voting_power = response['result'][0]['voting_power'] / 100.0
+    @last_vote_time = response['result'][0]['last_vote_time']
+    @actual_voting_power = get_actual_voting_power(@voting_power, @last_vote_time)
     #puts '*******************************************'
     #puts 'Golos: ' + @golos.to_s
     #puts 'Golos Power: ' + @golos_power.to_s
