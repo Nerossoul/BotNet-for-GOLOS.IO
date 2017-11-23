@@ -1,5 +1,5 @@
 require_relative 'golosuser.rb'
-require_relative 'botnetsettings'
+require_relative 'botnetsettings.rb'
 require 'securerandom'
 require 'json'
 
@@ -47,7 +47,7 @@ class BotNet
     lust_post_data = []
     max_number = get_account_history_max_number(user_name)
     limit_response = 1999
-    api = Radiator::Api.new(chain: :golos, url: 'https://ws.golos.io')
+    api = Radiator::Api.new(GOLOSOPTIONS)
     while max_number > 0 do
       puts "Получаем данные последнего поста #{user_name.brown}"
       limit_response = max_number - 1 if limit_response > max_number
@@ -69,7 +69,7 @@ class BotNet
   end
 
   def get_account_history_max_number(user_name)
-    api = Radiator::Api.new(chain: :golos, url: 'https://ws.golos.io')
+    api = Radiator::Api.new(GOLOSOPTIONS)
     puts "geting #{user_name.brown} account history max number"
     response = api.get_account_history(user_name, 800_000_000_000, 0)
     max_number = response['result'][0][0]
@@ -79,7 +79,8 @@ class BotNet
   end
 
   def sign_transaction(transaction_data, wif_key, user)
-    tx = Radiator::Transaction.new(wif: wif_key, chain: :golos, url: 'https://ws.golos.io')
+    options = GOLOSOPTIONS.merge({wif: wif_key, recover_transactions_on_error: false})
+    tx = Radiator::Transaction.new(options)
     tx.operations << transaction_data
     transaction_signed = false
     retry_count = 0
@@ -94,8 +95,9 @@ class BotNet
     while transaction_signed != true do
         begin
         response = tx.process(true)
+        # todo time.now user.user_name and response put to log file
         rescue Exception => e
-        puts "ТУТ ИДЕТ ВСЕ СООБЩЕНИЕ ОШИБКИ ЭТОТ ТЕКСТ НАДО ОТПРАВИТЬ ИНХЕРИТЕ КАК ISSUE".red.reverse_color
+        puts "ТУТ ИДЕТ ВСЕ СООБЩЕНИЕ ОШИБКИ ЭТОТ ТЕКСТ НАДО ОТПРАВИТЬ inertia186 КАК ISSUE".red.reverse_color
         puts e # e.message.red
         print e.backtrace.join("\n")
         puts "\n\r#{user.user_name.brown} got a error here. Try again in 15 sec".red.reverse_color
@@ -107,20 +109,28 @@ class BotNet
       if (response['error'] != nil && retry_count < 10)
         retry_count = retry_count + 1
         puts "\n\rWe 've got a ERROR MESSAGE NUMBER #{retry_count}'".red.reverse_color
-        puts response['error']['message'].red
-        puts "\n\rretry in #{retry_delay} seconds".red
-        sleep(retry_delay)
+        if response['error']['message'].include? DUPLICATE_TRANSACTION_ERROR
+          puts "ERROR: #{user.user_name}  trying duplicate transaction--> #{transaction_data}|Transaction ABORTED".red.reverse_color
+          sleep(4)
+          transaction_signed = true
+          user.signing_transaction_now = false
+        else
+          puts response['error']['message'].red
+          puts "\n\rretry in #{retry_delay} seconds".red
+          sleep(retry_delay)
+        end
       elsif response['result'] != nil
         sleep(4)
-        user.signing_transaction_now = false
         puts "\n\r#{user.user_name.upcase} success sing transaction -->".green +
         " #{transaction_data} at #{Time.now.utc}\n\r ".green +
         " #{JSON.pretty_generate(response['result'])}".green
         transaction_signed = true
+        user.signing_transaction_now = false
       else
         sleep(4)
+        puts "\n\rTransaction ABORTED #{response['error']['message']}".red
+        transaction_signed = true
         user.signing_transaction_now = false
-        puts "\n\rTransaction ABORTED #{response['error']['message']}".red.reverse_color
         # todo puts this error message to error_log file
       end
     end
@@ -162,7 +172,7 @@ class BotNet
     working_thread_max = MAX_THREADS
     #print "\n\rchecking permission to go on"
     while Thread.list.size >= working_thread_max do
-      puts "\n\rВсего потоков: #{Thread.list.size - 1} / MAX:#{MAX_THREADS}".red
+      puts "\n\rThreads: #{Thread.list.size - 1} / MAX:#{MAX_THREADS}".cyan
       sleep(1)
     end
     #puts " OK".green.bold
@@ -226,7 +236,7 @@ class BotNet
 
   def launch_playing_lotos #now it launchs golos.loto only but soon it will play momentloto
     #it is Krasnoyarsk time
-    golos_loto_lunch_time = [[17,20],[20,43],[23,20],[2,20],[7,0]]
+    golos_loto_lunch_time = [[17,20],[20,20],[23,20],[2,20],[7,20]]
     #momentloto_lunch_time = [[6:00], [11:00], [14:00], [17:00], [21:00], [02:00]]
     puts
     loop do
@@ -249,7 +259,7 @@ class BotNet
     user_vote_history = []
     max_number = get_account_history_max_number(user_name)
     limit_response = 1999
-    api = Radiator::Api.new(chain: :golos, url: 'https://ws.golos.io')
+    api = Radiator::Api.new(GOLOSOPTIONS)
     while max_number > 0 do
       puts "\n\rgetting #{user_name.brown} lust #{limit} upvotes"
       limit_response = max_number - 1 if limit_response > max_number
@@ -281,7 +291,7 @@ class BotNet
     user_reblog_history = []
     max_number = get_account_history_max_number(user_name)
     limit_response = 1999
-    api = Radiator::Api.new(chain: :golos, url: 'https://ws.golos.io')
+    api = Radiator::Api.new(GOLOSOPTIONS)
     puts "geting #{user_name.brown} reblogs"
     while max_number > 0 do
       limit_response = max_number - 1 if limit_response > max_number
@@ -310,7 +320,7 @@ class BotNet
   end
 
   def get_post_information(author, permlink)
-    api = Radiator::Api.new(chain: :golos, url: 'https://ws.golos.io')
+    api = Radiator::Api.new(GOLOSOPTIONS)
     print "Getting post information for #{author.brown}/#{permlink.brown} "
     response = api.get_content(author, permlink)
     #puts JSON.pretty_generate(response)

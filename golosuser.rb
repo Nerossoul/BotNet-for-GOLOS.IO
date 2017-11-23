@@ -1,5 +1,6 @@
 require 'radiator'
 require 'json'
+require_relative 'botnetsettings.rb'
 
 class GolosUser
 
@@ -31,11 +32,15 @@ class GolosUser
       timestamp_time_array = timestamp[1].split(':')
       timestamp_converted = Time.new(timestamp_date_array[0], timestamp_date_array[1], timestamp_date_array[2], timestamp_time_array[0], timestamp_time_array[1], timestamp_time_array[2], "+00:00")
       actual_voting_power = voting_power + ((Time.now.utc - timestamp_converted.utc) / 60 * 20 / 24 / 60)
-      return actual_voting_power.round(2)
+      if actual_voting_power > 100.0 then
+        return 100.0
+      else
+        return actual_voting_power.round(2)
+      end
     end
 
   def get_user_info
-    api = Radiator::Api.new(chain: :golos, url: 'https://ws.golos.io')
+    api = Radiator::Api.new(GOLOSOPTIONS)
     response = api.get_accounts([@user_name])
     golos_power = response['result'][0]['vesting_shares'].split(' ')
     #puts response['result'][0]['name']
@@ -56,7 +61,7 @@ class GolosUser
   end
 
   def get_steem_per_mvests
-    api = Radiator::Api.new(chain: :golos, url: 'https://ws.golos.io')
+    api = Radiator::Api.new(GOLOSOPTIONS)
     api.get_dynamic_global_properties do |properties|
       steem_per_mvests = 1_000_000.0 * properties.total_vesting_fund_steem.split[0].to_f / properties.total_vesting_shares.split[0].to_f
       format('%.3f', steem_per_mvests).to_f

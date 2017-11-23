@@ -10,7 +10,7 @@ puts Time.now
 loop do
   botnet_commander.users[35].get_user_info
   puts "\n\r#{botnet_commander.users[35].user_name.brown} voting power:#{botnet_commander.users[35].actual_voting_power.to_s.green} --> #{Time.now}"
-    if botnet_commander.users[35].actual_voting_power > 99.0
+    if botnet_commander.users[35].actual_voting_power > 99.5
       puts
       puts "RUN IT NOW #{Time.now}".red
       user_reblog_history = botnet_commander.get_reblog_history('upvote50-50', FIRST_PAYOUT_PERIOD + 24)
