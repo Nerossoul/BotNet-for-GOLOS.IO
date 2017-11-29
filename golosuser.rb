@@ -40,6 +40,7 @@ class GolosUser
     end
 
   def get_user_info
+    print "    ►►Getting #{user_name.brown} info "
     api = Radiator::Api.new(GOLOSOPTIONS)
     response = api.get_accounts([@user_name])
     golos_power = response['result'][0]['vesting_shares'].split(' ')
@@ -58,6 +59,7 @@ class GolosUser
     #puts 'Gests: ' + @gests.to_s
     #puts 'Voting_power: ' + @voting_power.to_s
     #puts '*******************************************'
+    puts "✔".green.bold
   end
 
   def get_steem_per_mvests

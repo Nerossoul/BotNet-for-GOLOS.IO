@@ -38,7 +38,10 @@ class BotNet
 
   def create_users
     user_hashs = read_users_data_from_file
+    user_count = 0
     user_hashs.each do |user|
+      user_count += 1
+      print "#{user_count}. "
       @users << GolosUser.new(user[:user_name], user[:post_key], user[:activ_key])
     end
   end
@@ -63,7 +66,7 @@ class BotNet
         end
       end
       max_number = max_number - 2000
-      sleep(1)
+      #sleep(1)
     end
     return lust_post_data
   end
@@ -73,7 +76,7 @@ class BotNet
     puts "geting #{user_name.brown} account history max number"
     response = api.get_account_history(user_name, 800_000_000_000, 0)
     max_number = response['result'][0][0]
-    sleep(1)
+    #sleep(1)
     puts "#{user_name.brown} account history max number is #{max_number}"
     return max_number
   end
@@ -87,11 +90,11 @@ class BotNet
     retry_delay = 6
     #check signing_transaction_now by this user/
     while user.signing_transaction_now == true do
-      #puts "\n\r#{user.user_name.brown} signing another transaction now...WAITING 4 seconds"
-      sleep(4)
+      #puts "\n\r#{user.user_name.brown} signing another transaction now...WAITING 1 second"
+      sleep(1)
     end
     user.signing_transaction_now = true
-    puts "\n\r#{user.user_name.brown} sing transaction --> #{transaction_data}".green
+    puts "\n\r#{user.user_name.brown} sing transaction ► #{transaction_data}".green
     while transaction_signed != true do
         begin
         response = tx.process(true)
@@ -110,9 +113,13 @@ class BotNet
         retry_count = retry_count + 1
         puts "\n\rWe 've got a ERROR MESSAGE NUMBER #{retry_count}'".red.reverse_color
         if response['error']['message'].include? DUPLICATE_TRANSACTION_ERROR
-          puts "ERROR: #{user.user_name}  trying duplicate transaction--> #{transaction_data}|Transaction ABORTED".red.reverse_color
+          puts "ERROR: #{user.user_name}  trying duplicate transaction ► #{transaction_data}|Transaction ABORTED".red.reverse_color
           sleep(4)
           transaction_signed = true
+          user.signing_transaction_now = false
+        elsif response['error']['message'].include? CHECK_MAX_BLOCK_AGE_ERROR
+          puts "ERROR: #{user.user_name}  MAX_BLOCK_AGE is wrong ► #{transaction_data}".red.reverse_color
+          sleep(4)
           user.signing_transaction_now = false
         else
           puts response['error']['message'].red
@@ -121,7 +128,7 @@ class BotNet
         end
       elsif response['result'] != nil
         sleep(4)
-        puts "\n\r#{user.user_name.upcase} success sing transaction -->".green +
+        puts "\n\r#{user.user_name.upcase} success sing transaction ► ".green +
         " #{transaction_data} at #{Time.now.utc}\n\r ".green +
         " #{JSON.pretty_generate(response['result'])}".green
         transaction_signed = true
@@ -172,7 +179,7 @@ class BotNet
     working_thread_max = MAX_THREADS
     #print "\n\rchecking permission to go on"
     while Thread.list.size >= working_thread_max do
-      puts "\n\rThreads: #{Thread.list.size - 1} / MAX:#{MAX_THREADS}".cyan
+      #puts "\n\rThreads: #{Thread.list.size - 1} / MAX:#{MAX_THREADS}".cyan
       sleep(1)
     end
     #puts " OK".green.bold
@@ -236,9 +243,9 @@ class BotNet
 
   def launch_playing_lotos #now it launchs golos.loto only but soon it will play momentloto
     #it is Krasnoyarsk time
-    golos_loto_lunch_time = [[17,20],[20,20],[23,20],[2,20],[7,20]]
-    #momentloto_lunch_time = [[6:00], [11:00], [14:00], [17:00], [21:00], [02:00]]
-    puts
+    golos_loto_lunch_time = GOLOS_LOTO_LUNCH_TIME
+    #momentloto_lunch_time = MOMENTLOTO_LUNCH_TIME
+    puts Time.now
     loop do
       t = Time.now
       print "."
@@ -369,17 +376,26 @@ class BotNet
           if post_been_voted then
             puts "\n\r#{user.user_name.upcase} already voted for @#{author}/#{permlink}".blue
           else
-            if user.future_voting_power > 95 then
+            if user.future_voting_power > MIN_VOTING_POWER then
               user.future_voting_power = user.future_voting_power - ((user.future_voting_power/100*0.5).round(2))
-              puts "\n\r#{user.user_name.brown} Voting Power now #{user.actual_voting_power.to_s.green}-->#{user.future_voting_power.to_s.green}".reverse_color
+              puts "\n\r#{user.user_name.brown} Voting Power now #{user.actual_voting_power.to_s.green} ► #{user.future_voting_power.to_s.green}".reverse_color
               vote = create_vote_data(user.user_name, author, permlink, 10000)
               # puts "\n\r#{user.user_name.brown} vote for @#{author}/#{permlink}."
               sign_transaction(vote, user.post_key, user)
             end
           end
-        end #end of Thread
-      end #end users.each
+        end # end of Thread
+      end # end users.each
+    users_with_minimum_voting_power = 0
+    @users.each do |user|
+      users_with_minimum_voting_power += 1 if user.future_voting_power < MIN_VOTING_POWER
     end
+    puts "Users_with_minimum_voting_power = #{users_with_minimum_voting_power}/#{@users.size}".cyan
+    if @users.size == users_with_minimum_voting_power
+      puts "Each user reach minimum voting power!".green.reverse_color
+      break
+    end
+    end # end of upvote_list.each
   end
 
   def get_time_object_from_golos_timestamp(timestamp)
