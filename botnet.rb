@@ -50,7 +50,8 @@ class BotNet
     lust_post_data = []
     max_number = get_account_history_max_number(user_name)
     limit_response = 1999
-    api = Radiator::Api.new(GOLOSOPTIONS)
+    options = GOLOSOPTIONS.merge({url: NODES_URLS.sample})
+    api = Radiator::Api.new(options)
     while max_number > 0 do
       puts "Получаем данные последнего поста #{user_name.brown}"
       limit_response = max_number - 1 if limit_response > max_number
@@ -72,7 +73,8 @@ class BotNet
   end
 
   def get_account_history_max_number(user_name)
-    api = Radiator::Api.new(GOLOSOPTIONS)
+    options = GOLOSOPTIONS.merge({url: NODES_URLS.sample})
+    api = Radiator::Api.new(options)
     puts "geting #{user_name.brown} account history max number"
     response = api.get_account_history(user_name, 800_000_000_000, 0)
     max_number = response['result'][0][0]
@@ -82,7 +84,7 @@ class BotNet
   end
 
   def sign_transaction(transaction_data, wif_key, user)
-    options = GOLOSOPTIONS.merge({wif: wif_key, recover_transactions_on_error: false})
+    options = GOLOSOPTIONS.merge({wif: wif_key, recover_transactions_on_error: false, url: NODES_URLS.sample})
     tx = Radiator::Transaction.new(options)
     tx.operations << transaction_data
     transaction_signed = false
@@ -91,7 +93,7 @@ class BotNet
     #check signing_transaction_now by this user/
     while user.signing_transaction_now == true do
       #puts "\n\r#{user.user_name.brown} signing another transaction now...WAITING 1 second"
-      sleep(1)
+      sleep(0.5)
     end
     user.signing_transaction_now = true
     puts "\n\r#{user.user_name.brown} sing transaction ► #{transaction_data}".green
@@ -180,7 +182,7 @@ class BotNet
     #print "\n\rchecking permission to go on"
     while Thread.list.size >= working_thread_max do
       #puts "\n\rThreads: #{Thread.list.size - 1} / MAX:#{MAX_THREADS}".cyan
-      sleep(1)
+      sleep(0.1)
     end
     #puts " OK".green.bold
   end
@@ -189,7 +191,7 @@ class BotNet
     while Thread.list.size > 1 do
       #puts "\n\rОжидаем завершения потоков: #{Thread.list.size - 1} / #{MAX_THREADS - 1}"
       #Thread.list.each {|t| puts t}
-      sleep(5)
+      sleep(0.1)
     end
     #puts "JOB WELL DONE"
   end
@@ -266,7 +268,8 @@ class BotNet
     user_vote_history = []
     max_number = get_account_history_max_number(user_name)
     limit_response = 1999
-    api = Radiator::Api.new(GOLOSOPTIONS)
+    options = GOLOSOPTIONS.merge({url: NODES_URLS.sample})
+    api = Radiator::Api.new(options)
     while max_number > 0 do
       puts "\n\rgetting #{user_name.brown} lust #{limit} upvotes"
       limit_response = max_number - 1 if limit_response > max_number
@@ -290,15 +293,13 @@ class BotNet
     return user_vote_history
   end
 
-  def did_i_vote_here(user_name, author, permlink)
-    # todo
-  end
 
   def get_reblog_history(user_name, period_hours) #it returns reblog history for lust puriod in hours
     user_reblog_history = []
     max_number = get_account_history_max_number(user_name)
     limit_response = 1999
-    api = Radiator::Api.new(GOLOSOPTIONS)
+    options = GOLOSOPTIONS.merge({url: NODES_URLS.sample})
+    api = Radiator::Api.new(options)
     puts "geting #{user_name.brown} reblogs"
     while max_number > 0 do
       limit_response = max_number - 1 if limit_response > max_number
@@ -326,8 +327,127 @@ class BotNet
     return user_reblog_history
   end
 
+  def self.save_max_block_number_to_file(max_block_number)
+    current_path = "/" + File.dirname(__FILE__)
+    file_name = current_path + "/resources/maxblocknumber.txt"
+    f = File.new(file_name, "w")
+    f.puts max_block_number
+    f.close
+  end
+
+  def self.get_lust_max_block_number_from_file
+    current_path = "/" + File.dirname(__FILE__)
+    max_block_number = read_from_file(current_path + "/resources/maxblocknumber.txt")
+    max_block_number[0].to_i
+  end
+
+  def self.get_max_block_number
+    options = GOLOSOPTIONS.merge({url: NODES_URLS.sample})
+    api = Radiator::Api.new(options)
+    response = api.get_dynamic_global_properties
+    response['result']['head_block_number']
+  end
+
+  def self.get_block(block_number)
+    options = GOLOSOPTIONS.merge({url: NODES_URLS.sample})
+    api = Radiator::Api.new(options)
+    response = api.get_block(block_number)
+    #puts JSON.pretty_generate(response)
+    return response
+  end
+
+  def self.get_posts_by_tag_from_block(good_tag_array, block_data)
+  posts_by_tag = []
+  #  puts JSON.pretty_generate(block_data['result']["transactions"])
+    block_data['result']["transactions"].each do |transaction|
+      if (transaction['operations'][0][0] == 'comment') && (transaction['operations'][0][1]['parent_author'] == '')
+        tags = JSON.parse(transaction['operations'][0][1]["json_metadata"])["tags"]
+        tags.each do |tag|
+          # puts "-->" + tag
+          if good_tag_array.include?(tag)
+            # puts "timestamp: #{block_data["result"]["timestamp"]}"
+            # puts transaction['operations'][0][0]
+            # puts transaction['operations'][0][1]['parent_author']
+            # puts transaction['operations'][0][1]['author']
+            # puts transaction['operations'][0][1]['permlink']
+            # puts tags
+            # puts "*************************"
+            posts_by_tag << { 'author' => transaction['operations'][0][1]['author'],
+                              'permlink' => transaction['operations'][0][1]['permlink'],
+                              'timestamp' => block_data["result"]["timestamp"] }
+            break
+          end # if
+        end # tags.each
+      end # if
+    end # block_data_operations.each
+    posts_by_tag
+  end
+
+  def self.get_posts_array_for_vote(max_block_number)
+    posts_array_for_vote = []
+    current_path = "/" + File.dirname(__FILE__)
+    posts_array_for_vote = posts_array_for_vote + read_from_file(current_path + "/resources/posts.txt")
+    posts_array_for_vote.each do |post|
+    post = JSON.parse(post.strip.to_json)
+    end
+    puts "#{max_block_number.to_i}" + "<---"
+    min_block_number = get_lust_max_block_number_from_file
+    if (max_block_number - min_block_number) > ((FIRST_PAYOUT_PERIOD + 24)*60*60/3)
+      puts "#{(max_block_number - min_block_number)} > #{((FIRST_PAYOUT_PERIOD + 24)*60*60/3)}"
+      min_block_number = max_block_number-(FIRST_PAYOUT_PERIOD + 24)*60*60/3
+    end
+    (max_block_number - min_block_number).times do |i|
+      puts "#{i}: #{(max_block_number - i).to_s.green} "
+      block_data = get_block(max_block_number - i)
+      posts_from_block = get_posts_by_tag_from_block(GOOD_TAG_ARRAY, block_data)
+      posts_array_for_vote = posts_array_for_vote + posts_from_block
+    end
+    posts_array_for_vote_uniq = post_array_uniqalization(posts_array_for_vote)
+    posts_array_for_vote_clean = delete_old_posts_from_array(posts_array_for_vote_uniq)
+    save_to_file_posts_array(posts_array_for_vote_clean)
+    save_max_block_number_to_file(max_block_number)
+    return posts_array_for_vote_clean
+  end
+
+  def self.save_to_file_posts_array(posts_array_for_vote)
+    current_path = "/" + File.dirname(__FILE__)
+    file_name = current_path + "/resources/posts.txt"
+    f = File.new(file_name, "w")
+    posts_array_for_vote.each do |line|
+      f.puts line
+    end
+    f.close
+  end
+
+  def self.delete_old_posts_from_array(array_start)
+    array_result = []
+    array_start.each do |array_start_elem|
+      if get_time_object_from_golos_timestamp(array_start_elem['timestamp']) > (Time.now.utc - (FIRST_PAYOUT_PERIOD + 24)*60*60)
+        array_result << array_start_elem
+      end
+    end
+    array_result
+  end
+
+  def self.post_array_uniqalization(array_start)
+    array_result = []
+    array_start.each do |element|
+      array_result << { "author" => element["author"], "permlink"=> element["permlink"]}
+    end
+    array_result.uniq!
+    array_result.each do |array_result_elem|
+      array_start.each do |array_start_elem|
+        if (array_result_elem['author']==array_start_elem['author']) && (array_result_elem['permlink']==array_start_elem['permlink'])
+          array_result_elem['timestamp'] = array_start_elem['timestamp']
+        end
+      end
+    end
+    array_result
+  end
+
   def get_post_information(author, permlink)
-    api = Radiator::Api.new(GOLOSOPTIONS)
+    options = GOLOSOPTIONS.merge({url: NODES_URLS.sample})
+    api = Radiator::Api.new(options)
     print "Getting post information for #{author.brown}/#{permlink.brown} "
     response = api.get_content(author, permlink)
     #puts JSON.pretty_generate(response)
@@ -376,7 +496,13 @@ class BotNet
           if post_been_voted then
             puts "\n\r#{user.user_name.upcase} already voted for @#{author}/#{permlink}".blue
           else
-            if user.future_voting_power > MIN_VOTING_POWER then
+            user_min_voting_power = MIN_VOTING_POWER - user.voiting_credit
+            if user_min_voting_power < 83 then
+              user_min_voting_power = 83
+            end
+            puts "#{user.user_name}:user.future_voting_power = #{user.future_voting_power}, user_min_voting_power = #{user_min_voting_power.round(2)}".gray +
+            " (MIN_VOTING_POWER = #{MIN_VOTING_POWER}, user.voiting_credit = #{user.voiting_credit})".gray
+            if (user.future_voting_power > user_min_voting_power)
               user.future_voting_power = user.future_voting_power - ((user.future_voting_power/100*0.5).round(2))
               puts "\n\r#{user.user_name.brown} Voting Power now #{user.actual_voting_power.to_s.green} ► #{user.future_voting_power.to_s.green}".reverse_color
               vote = create_vote_data(user.user_name, author, permlink, 10000)
@@ -388,7 +514,11 @@ class BotNet
       end # end users.each
     users_with_minimum_voting_power = 0
     @users.each do |user|
-      users_with_minimum_voting_power += 1 if user.future_voting_power < MIN_VOTING_POWER
+      user_min_voting_power = MIN_VOTING_POWER - user.voiting_credit
+      if user_min_voting_power < 83 then
+        user_min_voting_power = 83
+      end
+      users_with_minimum_voting_power += 1 if user.future_voting_power <= user_min_voting_power
     end
     puts "Users_with_minimum_voting_power = #{users_with_minimum_voting_power}/#{@users.size}".cyan
     if @users.size == users_with_minimum_voting_power
@@ -398,12 +528,52 @@ class BotNet
     end # end of upvote_list.each
   end
 
-  def get_time_object_from_golos_timestamp(timestamp)
+  def self.get_time_object_from_golos_timestamp(timestamp)
     timestamp = timestamp.split('T')
     timestamp_date_array = timestamp[0].split('-')
     timestamp_time_array = timestamp[1].split(':')
     timestamp_converted = Time.new(timestamp_date_array[0], timestamp_date_array[1], timestamp_date_array[2], timestamp_time_array[0], timestamp_time_array[1], timestamp_time_array[2], "+00:00")
     return timestamp_converted.utc
+  end
+
+  def create_gbg_transfer_data(sender, recipient, amount, memo)
+    transfer = {
+  type: :transfer,
+  from: sender,
+  to: recipient,
+  amount: amount,
+  memo: memo
+                }
+    return transfer
+  end
+
+  def self.read_from_file(file_name)
+    if File.exists?(file_name)
+          f= File.new(file_name, 'r:UTF-8')
+          lines = f.readlines
+          f.close
+          return lines
+    else
+          return []
+    end
+  end
+
+  def create_cool_memos_array
+    current_path = "/" + File.dirname(__FILE__)
+    read_from_file(current_path + "/resources/aforisms.txt")
+  end
+
+
+  def gbg_concentration(recipient)
+    memos = create_cool_memos_array
+    @users.each do |user|
+      if user.user_name != recipient
+      transaction_data = create_gbg_transfer_data(user.user_name, recipient, user.gbg, memos.sample)
+      sign_transaction(transaction_data, user.activ_key, user)
+      else
+      puts "I do not want to transfer to myself. #{user.user_name.upcase}".green
+      end
+    end
   end
 
   def folow_vote_history(user_vote_history) #todo try a

@@ -6,13 +6,12 @@ class GolosUser
 
   attr_reader(:user_name, :post_key, :activ_key, :golos, :golos_power, :gbg,
               :gests, :voting_power , :last_vote_time, :actual_voting_power)
-  attr_accessor(:till_what_time_to_sleep, :signing_transaction_now, :future_voting_power)
+  attr_accessor(:voiting_credit, :signing_transaction_now, :future_voting_power)
 
   def initialize(user_name, post_key, activ_key)
     @user_name = user_name
     @post_key = post_key
     @activ_key = activ_key
-    @till_what_time_to_sleep = Time.now.utc
     @signing_transaction_now = false
     @golos = 0.0
     @golos_power = 0.0
@@ -21,6 +20,7 @@ class GolosUser
     @voting_power = 0.0
     @last_vote_time = nil
     @actual_voting_power = 0.0
+    @voiting_credit = 0.0
     puts "Creating user #{user_name.brown}"
     get_user_info
     @future_voting_power = @voting_power
@@ -33,15 +33,16 @@ class GolosUser
       timestamp_converted = Time.new(timestamp_date_array[0], timestamp_date_array[1], timestamp_date_array[2], timestamp_time_array[0], timestamp_time_array[1], timestamp_time_array[2], "+00:00")
       actual_voting_power = voting_power + ((Time.now.utc - timestamp_converted.utc) / 60 * 20 / 24 / 60)
       if actual_voting_power > 100.0 then
-        return 100.0
+        return [100.0 , (actual_voting_power - 100).round(2)]
       else
-        return actual_voting_power.round(2)
+        return [actual_voting_power.round(2), 0.0]
       end
     end
 
   def get_user_info
     print "    ►►Getting #{user_name.brown} info "
-    api = Radiator::Api.new(GOLOSOPTIONS)
+    options = GOLOSOPTIONS.merge({url: NODES_URLS.sample})
+    api = Radiator::Api.new(options)
     response = api.get_accounts([@user_name])
     golos_power = response['result'][0]['vesting_shares'].split(' ')
     #puts response['result'][0]['name']
@@ -51,7 +52,9 @@ class GolosUser
     @gests = response['result'][0]['vesting_shares']
     @voting_power = response['result'][0]['voting_power'] / 100.0
     @last_vote_time = response['result'][0]['last_vote_time']
-    @actual_voting_power = get_actual_voting_power(@voting_power, @last_vote_time)
+    actual_vp_and_voting_credit_in_array = get_actual_voting_power(@voting_power, @last_vote_time)
+    @actual_voting_power = actual_vp_and_voting_credit_in_array[0]
+    @voiting_credit = actual_vp_and_voting_credit_in_array[1]
     #puts '*******************************************'
     #puts 'Golos: ' + @golos.to_s
     #puts 'Golos Power: ' + @golos_power.to_s
@@ -63,7 +66,8 @@ class GolosUser
   end
 
   def get_steem_per_mvests
-    api = Radiator::Api.new(GOLOSOPTIONS)
+    options = GOLOSOPTIONS.merge({url: NODES_URLS.sample})
+    api = Radiator::Api.new(options)
     api.get_dynamic_global_properties do |properties|
       steem_per_mvests = 1_000_000.0 * properties.total_vesting_fund_steem.split[0].to_f / properties.total_vesting_shares.split[0].to_f
       format('%.3f', steem_per_mvests).to_f
