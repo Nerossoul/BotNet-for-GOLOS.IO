@@ -14,12 +14,12 @@ loop do
   if actual_voting_power[0] > MAX_VOTING_POWER
     puts
     puts "RUN IT NOW #{Time.now}".red
-    user_reblog_history = botnet_commander.get_reblog_history('upvote50-50', FIRST_PAYOUT_PERIOD + 24)
+    user_reblog_history = botnet_commander.get_reblog_history('upvot50-50', FIRST_PAYOUT_PERIOD + 24)
     upvote_list = botnet_commander.create_upvote_list_from_reblog_history(user_reblog_history)
     user_reblog_history = nil
     upvote_list.each_with_index { |elem, num| puts "#{num+1}: #{elem[:pending_payout_value].to_s.green} => #{elem[:author].brown}/#{elem[:permlink].brown} "}
     botnet_commander.vote_by_each_user_for_upvote_list(upvote_list)
-    botnet_commander.wait_while_all_threads_are_done
+    BotNet.wait_while_all_threads_are_done
     upvote_list = nil
     t = Time.now
     puts "All users has been voted at #{t.hour}:#{t.min}. Waiting for next lunch".reverse_color

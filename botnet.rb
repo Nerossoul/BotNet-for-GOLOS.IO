@@ -14,7 +14,7 @@ class BotNet
     create_users
   end
 
-  def read_users_data_from_file
+  def self.read_users_data_from_file
     current_path = File.dirname(__FILE__)
     file_name = current_path + '/botlist.txt'
     if File.exist?(file_name)
@@ -37,7 +37,7 @@ class BotNet
   end
 
   def create_users
-    user_hashs = read_users_data_from_file
+    user_hashs = BotNet.read_users_data_from_file
     user_count = 0
     user_hashs.each do |user|
       user_count += 1
@@ -73,17 +73,29 @@ class BotNet
   end
 
   def get_account_history_max_number(user_name)
-    options = GOLOSOPTIONS.merge({url: NODES_URLS.sample})
-    api = Radiator::Api.new(options)
+
     puts "geting #{user_name.brown} account history max number"
-    response = api.get_account_history(user_name, 800_000_000_000, 0)
-    max_number = response['result'][0][0]
+    got_max_number = false
+    while got_max_number != true
+      begin
+        options = GOLOSOPTIONS.merge({url: NODES_URLS.sample})
+        api = Radiator::Api.new(options)
+        response = api.get_account_history(user_name, 800_000_000_000, 0)
+        max_number = response['result'][0][0]
+        got_max_number = true
+      rescue Exception => e
+        puts "get_account_history_max_number ERROR".red
+        puts e # e.message.red
+        print e.backtrace.join("\n")
+        sleep(5)
+      end
+    end
     #sleep(1)
     puts "#{user_name.brown} account history max number is #{max_number}"
     return max_number
   end
 
-  def sign_transaction(transaction_data, wif_key, user)
+  def self.sign_transaction(transaction_data, wif_key, user)
     options = GOLOSOPTIONS.merge({wif: wif_key, recover_transactions_on_error: false, url: NODES_URLS.sample})
     tx = Radiator::Transaction.new(options)
     tx.operations << transaction_data
@@ -119,6 +131,11 @@ class BotNet
           sleep(4)
           transaction_signed = true
           user.signing_transaction_now = false
+        elsif response['error']['message'].include? ALREDY_REBLOGGED_ERROR
+          puts "ERROR: #{user.user_name}  already reblogged this post ► #{transaction_data}|Transaction ABORTED".red.reverse_color
+          sleep(4)
+          transaction_signed = true
+          user.signing_transaction_now = false
         elsif response['error']['message'].include? CHECK_MAX_BLOCK_AGE_ERROR
           puts "ERROR: #{user.user_name}  MAX_BLOCK_AGE is wrong ► #{transaction_data}".red.reverse_color
           sleep(4)
@@ -143,6 +160,24 @@ class BotNet
         # todo puts this error message to error_log file
       end
     end
+  end
+
+  def self.create_reblog_data(user_name, author, permlink)
+    data = [
+      :reblog, {
+        account: user_name,
+        author: author,
+        permlink: permlink
+      }
+    ]
+    reblog_custom_json = {
+      type: :custom_json,
+      id: 'follow',
+      required_auths: [],
+      required_posting_auths: [user_name],
+      json: data.to_json
+    }
+    return reblog_custom_json
   end
 
   def create_vote_data(voter, author, permlink, weight)
@@ -177,7 +212,7 @@ class BotNet
     return permlink
   end
 
-  def get_permission_to_run_thead
+  def self.get_permission_to_run_thead
     working_thread_max = MAX_THREADS
     #print "\n\rchecking permission to go on"
     while Thread.list.size >= working_thread_max do
@@ -187,7 +222,7 @@ class BotNet
     #puts " OK".green.bold
   end
 
-  def wait_while_all_threads_are_done
+  def self.wait_while_all_threads_are_done
     while Thread.list.size > 1 do
       #puts "\n\rОжидаем завершения потоков: #{Thread.list.size - 1} / #{MAX_THREADS - 1}"
       #Thread.list.each {|t| puts t}
@@ -204,7 +239,7 @@ class BotNet
     json_metadata = ''
     post_information = get_post_information(parent_author, parent_permlink)
     @users.each do |user|
-      get_permission_to_run_thead
+      BotNet.get_permission_to_run_thead
       Thread::abort_on_exception = true
       Thread.new(user) do |user_of_this_thread|
         body = generate_golos_loto_ticket
@@ -217,9 +252,9 @@ class BotNet
         if post_been_voted then
           puts "\n\r#{user_of_this_thread.user_name.upcase} already voted for @#{parent_author}/#{parent_permlink}".blue
         else
-          sign_transaction(vote, user_of_this_thread.post_key, user_of_this_thread)
+          BotNet.sign_transaction(vote, user_of_this_thread.post_key, user_of_this_thread)
         end
-        sign_transaction(comment, user_of_this_thread.post_key, user_of_this_thread)
+        BotNet.sign_transaction(comment, user_of_this_thread.post_key, user_of_this_thread)
       end
     end
   end
@@ -234,7 +269,7 @@ class BotNet
       Thread.new(user) do |user_of_this_thread|
         vote = create_vote_data(user_of_this_thread.user_name, parent_author, parent_permlink, 100)
         puts "\n\r#{user_of_this_thread.user_name.brown} vote for @#{parent_author}/#{parent_permlink}".blue
-        sign_transaction(vote, user_of_this_thread.post_key, user_of_this_thread)
+        BotNet.sign_transaction(vote, user_of_this_thread.post_key, user_of_this_thread)
       end
     end
   end
@@ -255,7 +290,7 @@ class BotNet
         if (t.hour == time_x[0] and t.min == time_x[1])
           puts "\n\rRUN IT NOW".red
           play_golos_loto
-          wait_while_all_threads_are_done
+          BotNet.wait_while_all_threads_are_done
             t = Time.now
             puts "\n\rAll users finished playing loto at #{t.hour}:#{t.min}. Waiting for next lunch".reverse_color
         end
@@ -309,7 +344,7 @@ class BotNet
         if result[1]['op'][0] == 'custom_json' then
           response_json_array = JSON.parse(result[1]['op'][1]['json'])
           if response_json_array[0] == "reblog" then
-            t = get_time_object_from_golos_timestamp(result[1]['timestamp'])
+            t = BotNet.get_time_object_from_golos_timestamp(result[1]['timestamp'])
             t = (Time.now.utc - t)/3600
             if t.to_i >= period_hours then
               max_number = 0
@@ -327,7 +362,7 @@ class BotNet
     return user_reblog_history
   end
 
-  def self.save_max_block_number_to_file(max_block_number)
+  def self.save_block_number_to_file(max_block_number)
     current_path = "/" + File.dirname(__FILE__)
     file_name = current_path + "/resources/maxblocknumber.txt"
     f = File.new(file_name, "w")
@@ -344,14 +379,34 @@ class BotNet
   def self.get_max_block_number
     options = GOLOSOPTIONS.merge({url: NODES_URLS.sample})
     api = Radiator::Api.new(options)
-    response = api.get_dynamic_global_properties
+    got_block_number = false
+    while got_block_number != true
+      begin
+        response = api.get_dynamic_global_properties
+        got_block_number = true
+      rescue Exception => e
+        puts "GET_BLOCK_NUMBER ERROR".red
+        puts e # e.message.red
+        print e.backtrace.join("\n")
+      end
+    end
     response['result']['head_block_number']
   end
 
   def self.get_block(block_number)
     options = GOLOSOPTIONS.merge({url: NODES_URLS.sample})
     api = Radiator::Api.new(options)
-    response = api.get_block(block_number)
+    got_block = false
+    while got_block != true
+      begin
+        response = api.get_block(block_number)
+        got_block = true
+      rescue Exception => e
+      puts "GET_BLOCK ERROR".red
+      puts e # e.message.red
+      print e.backtrace.join("\n")
+      end
+    end
     #puts JSON.pretty_generate(response)
     return response
   end
@@ -359,27 +414,31 @@ class BotNet
   def self.get_posts_by_tag_from_block(good_tag_array, block_data)
   posts_by_tag = []
   #  puts JSON.pretty_generate(block_data['result']["transactions"])
-    block_data['result']["transactions"].each do |transaction|
-      if (transaction['operations'][0][0] == 'comment') && (transaction['operations'][0][1]['parent_author'] == '')
-        tags = JSON.parse(transaction['operations'][0][1]["json_metadata"])["tags"]
-        tags.each do |tag|
-          # puts "-->" + tag
-          if good_tag_array.include?(tag)
-            # puts "timestamp: #{block_data["result"]["timestamp"]}"
-            # puts transaction['operations'][0][0]
-            # puts transaction['operations'][0][1]['parent_author']
-            # puts transaction['operations'][0][1]['author']
-            # puts transaction['operations'][0][1]['permlink']
-            # puts tags
-            # puts "*************************"
-            posts_by_tag << { 'author' => transaction['operations'][0][1]['author'],
-                              'permlink' => transaction['operations'][0][1]['permlink'],
-                              'timestamp' => block_data["result"]["timestamp"] }
-            break
-          end # if
-        end # tags.each
-      end # if
-    end # block_data_operations.each
+    if block_data['result'] != nil
+      block_data['result']["transactions"].each do |transaction|
+        if (transaction['operations'][0][0] == 'comment') && (transaction['operations'][0][1]['parent_author'] == '')
+          tags = JSON.parse(transaction['operations'][0][1]["json_metadata"])["tags"]
+          if tags != nil
+            tags.each do |tag|
+              # puts "-->" + tag
+              if good_tag_array.include?(tag)
+                # puts "timestamp: #{block_data["result"]["timestamp"]}"
+                # puts transaction['operations'][0][0]
+                # puts transaction['operations'][0][1]['parent_author']
+                # puts transaction['operations'][0][1]['author']
+                # puts transaction['operations'][0][1]['permlink']
+                # puts tags
+                # puts "*************************"
+                posts_by_tag << { 'author' => transaction['operations'][0][1]['author'],
+                                  'permlink' => transaction['operations'][0][1]['permlink'],
+                                  'timestamp' => block_data['result']['timestamp'] }
+                break
+              end # if
+            end # tags.each
+          end # if tags != nil
+        end # if
+      end # block_data_operations.each
+    end
     posts_by_tag
   end
 
@@ -390,14 +449,13 @@ class BotNet
     posts_array_for_vote.each do |post|
     post = JSON.parse(post.strip.to_json)
     end
-    puts "#{max_block_number.to_i}" + "<---"
     min_block_number = get_lust_max_block_number_from_file
     if (max_block_number - min_block_number) > ((FIRST_PAYOUT_PERIOD + 24)*60*60/3)
-      puts "#{(max_block_number - min_block_number)} > #{((FIRST_PAYOUT_PERIOD + 24)*60*60/3)}"
       min_block_number = max_block_number-(FIRST_PAYOUT_PERIOD + 24)*60*60/3
     end
+    puts "#{max_block_number.to_i} ---> #{min_block_number}"
     (max_block_number - min_block_number).times do |i|
-      puts "#{i}: #{(max_block_number - i).to_s.green} "
+      puts "#{i}: #{(max_block_number - i).to_s.green} --> #{min_block_number} :#{(max_block_number - i - min_block_number).to_s}"
       block_data = get_block(max_block_number - i)
       posts_from_block = get_posts_by_tag_from_block(GOOD_TAG_ARRAY, block_data)
       posts_array_for_vote = posts_array_for_vote + posts_from_block
@@ -405,7 +463,7 @@ class BotNet
     posts_array_for_vote_uniq = post_array_uniqalization(posts_array_for_vote)
     posts_array_for_vote_clean = delete_old_posts_from_array(posts_array_for_vote_uniq)
     save_to_file_posts_array(posts_array_for_vote_clean)
-    save_max_block_number_to_file(max_block_number)
+    save_block_number_to_file(max_block_number)
     return posts_array_for_vote_clean
   end
 
@@ -421,28 +479,55 @@ class BotNet
 
   def self.delete_old_posts_from_array(array_start)
     array_result = []
+    puts "delete_old_posts_from_array".red
+    puts array_start
+    puts "^^^^^^^^^^^^^^^^^".red
     array_start.each do |array_start_elem|
-      if get_time_object_from_golos_timestamp(array_start_elem['timestamp']) > (Time.now.utc - (FIRST_PAYOUT_PERIOD + 24)*60*60)
+      time = Time.now.utc
+      print "OLD? #{array_start_elem} time #{Time.now.utc}"
+      if get_time_object_from_golos_timestamp(array_start_elem['timestamp']) > (time - (FIRST_PAYOUT_PERIOD + 24)*60*60)
+        puts "<<--GOOD POST ADDED TO ARRAY".green
         array_result << array_start_elem
+      else
+        puts "<<--OLD POST MOVE TO TRASH".red
       end
     end
     array_result
   end
 
+  def self.string_to_hash(string)
+    print "#{string} --> it is #{string.class}-->"
+    if string.class.to_s != 'Hash'
+      puts " convert to Hash"
+      return eval(string)
+    else
+      puts " alredy Hash"
+      return string
+    end
+  end
+
   def self.post_array_uniqalization(array_start)
+    puts "Uniqalization of this stack".red
+    puts array_start
+    puts "^^^^^^^^^^^^^^^^^".red
     array_result = []
+    array_result2 = []
     array_start.each do |element|
-      array_result << { "author" => element["author"], "permlink"=> element["permlink"]}
+      elem = string_to_hash(element)
+      array_result << {"author" => elem["author"], "permlink"=> elem["permlink"]}
     end
     array_result.uniq!
     array_result.each do |array_result_elem|
       array_start.each do |array_start_elem|
         if (array_result_elem['author']==array_start_elem['author']) && (array_result_elem['permlink']==array_start_elem['permlink'])
           array_result_elem['timestamp'] = array_start_elem['timestamp']
+          array_result2 << array_start_elem
+          break
         end
       end
     end
-    array_result
+    puts "^^^^^^^^^^^^^^^^^".red
+    array_result2
   end
 
   def get_post_information(author, permlink)
@@ -456,7 +541,7 @@ class BotNet
               :permlink =>  response['result']['permlink'],
               :mode =>  response['result']['mode'],
               :pending_payout_value => response['result']['pending_payout_value'].split(' ')[0].to_f,
-              :cashout_time => get_time_object_from_golos_timestamp(response['result']['cashout_time']),
+              :cashout_time => BotNet.get_time_object_from_golos_timestamp(response['result']['cashout_time']),
               :active_votes =>response['result']['active_votes']
     }
     print "DONE ".green.bold
@@ -488,7 +573,7 @@ class BotNet
       puts "\n\r************************"
       puts "\n\rUpvoting for #{post[:pending_payout_value].to_s.green} => #{post[:author].brown}/#{post[:permlink].brown}".reverse_color
       @users.each do |user|
-        get_permission_to_run_thead
+        BotNet.get_permission_to_run_thead
         Thread::abort_on_exception = true
         Thread.new(user, post[:author], post[:permlink], post[:active_votes]) do |user, author, permlink, active_votes|
           post_been_voted = false
@@ -507,7 +592,7 @@ class BotNet
               puts "\n\r#{user.user_name.brown} Voting Power now #{user.actual_voting_power.to_s.green} ► #{user.future_voting_power.to_s.green}".reverse_color
               vote = create_vote_data(user.user_name, author, permlink, 10000)
               # puts "\n\r#{user.user_name.brown} vote for @#{author}/#{permlink}."
-              sign_transaction(vote, user.post_key, user)
+              BotNet.sign_transaction(vote, user.post_key, user)
             end
           end
         end # end of Thread
@@ -558,18 +643,18 @@ class BotNet
     end
   end
 
-  def create_cool_memos_array
+  def self.create_cool_memos_array
     current_path = "/" + File.dirname(__FILE__)
     read_from_file(current_path + "/resources/aforisms.txt")
   end
 
 
   def gbg_concentration(recipient)
-    memos = create_cool_memos_array
+    memos = BotNet.create_cool_memos_array
     @users.each do |user|
       if user.user_name != recipient
       transaction_data = create_gbg_transfer_data(user.user_name, recipient, user.gbg, memos.sample)
-      sign_transaction(transaction_data, user.activ_key, user)
+      BotNet.sign_transaction(transaction_data, user.activ_key, user)
       else
       puts "I do not want to transfer to myself. #{user.user_name.upcase}".green
       end
@@ -580,7 +665,7 @@ class BotNet
     user_vote_history.each do |vote_data_from_history|
       puts vote_data_from_history['op'][1]['author']
       puts vote_data_from_history['op'][1]['permlink']
-      puts "******"
+      puts "***************"
     # @users.each do |user|
       #  get_permission_to_run_thead
       #  Thread::abort_on_exception = true
