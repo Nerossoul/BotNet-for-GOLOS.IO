@@ -15,7 +15,7 @@ loop do
   puts "Next iteration from block #{(min_block_number+1).to_s}. write this block to file".cyan.reverse_color
   BotNet.save_block_number_to_file(min_block_number)
   steps_to_max = max_block_number - delay_time - min_block_number - 1
-  if steps_to_max <= 10
+  if steps_to_max <= 39
     puts 'wait for next few blocks born -> 120 sec...'.gray.bold
     120.times do |sec_count|
       sleep(1)

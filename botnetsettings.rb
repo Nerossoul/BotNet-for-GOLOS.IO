@@ -12,7 +12,7 @@ NODES_URLS = [#'https://ws.golos.io',
               ]
 GOLOSOPTIONS = {
                 chain: :golos,
-                failover_urls:['https://ws.golos.io',
+                failover_urls: ['https://ws.golos.io',
                               #'https://api2.golos.cf']#,
                               #'https://ws.goldvoice.club/'
                               #'https://api.golos.cf'

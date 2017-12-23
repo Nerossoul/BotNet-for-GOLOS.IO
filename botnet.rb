@@ -137,7 +137,10 @@ class BotNet
           transaction_signed = true
           user.signing_transaction_now = false
         elsif response['error']['message'].include? CHECK_MAX_BLOCK_AGE_ERROR
-          puts "ERROR: #{user.user_name}  MAX_BLOCK_AGE is wrong ► #{transaction_data}".red.reverse_color
+          puts "ERROR: #{user.user_name}  MAX_BLOCK_AGE is wrong ► #{transaction_data} \n\r Change node".red.reverse_color
+          options = GOLOSOPTIONS.merge({wif: wif_key, recover_transactions_on_error: false, url: NODES_URLS.sample})
+          tx = Radiator::Transaction.new(options)
+          tx.operations << transaction_data
           sleep(4)
           user.signing_transaction_now = false
         else
@@ -534,8 +537,19 @@ class BotNet
     options = GOLOSOPTIONS.merge({url: NODES_URLS.sample})
     api = Radiator::Api.new(options)
     print "Getting post information for #{author.brown}/#{permlink.brown} "
-    response = api.get_content(author, permlink)
-    #puts JSON.pretty_generate(response)
+    got_post_information = false
+    while got_post_information != true
+      begin
+        response = api.get_content(author, permlink)
+        #puts JSON.pretty_generate(response)
+        got_post_information = true
+      rescue Exception => e
+        puts "get_post_information ERROR".red
+        puts e # e.message.red
+        print e.backtrace.join("\n")
+        sleep(5)
+      end
+    end
     post_information = {
               :author => response['result']['author'],
               :permlink =>  response['result']['permlink'],
