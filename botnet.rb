@@ -1,4 +1,5 @@
 require_relative 'golosuser.rb'
+require_relative 'blacklist.rb'
 require_relative 'botnetsettings.rb'
 require 'securerandom'
 require 'json'
@@ -579,6 +580,7 @@ class BotNet
   end
 
   def vote_by_each_user_for_upvote_list(upvote_list)
+    black_list_array = BlackList.open
     @users.each do |user|
     user.get_user_info
     user.future_voting_power = user.actual_voting_power
@@ -591,9 +593,11 @@ class BotNet
         Thread::abort_on_exception = true
         Thread.new(user, post[:author], post[:permlink], post[:active_votes]) do |user, author, permlink, active_votes|
           post_been_voted = false
+          author_in_black_list = black_list_array.include? "#{user.user_name}/#{author}"
           active_votes.each { |elem| post_been_voted = true if user.user_name == elem['voter'] }
-          if post_been_voted then
-            puts "\n\r#{user.user_name.upcase} already voted for @#{author}/#{permlink}".blue
+          if post_been_voted || author_in_black_list then
+            puts "\n\r#{user.user_name.upcase} already voted for @#{author}/#{permlink}".blue if post_been_voted
+            puts "\n\r#{author} is in #{user.user_name.upcase}\'s black list".cyan if author_in_black_list
           else
             user_min_voting_power = MIN_VOTING_POWER - user.voiting_credit
             if user_min_voting_power < 83 then

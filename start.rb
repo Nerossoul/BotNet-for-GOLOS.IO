@@ -6,6 +6,13 @@ require_relative 'stringformat.rb'
 require 'tiny_tds'
 
 
+
+botnet_commander = BotNet.new
+
+
+
+
+=begin
 client = TinyTds::Client.new username: 'golos', password: 'golos', host: 'sql.golos.cloud', port: 1433, database: 'DBGolos'
 puts 'Connecting to SQL Server'
 
@@ -47,3 +54,4 @@ result.each do |row|
 end
 
 client.close
+=end

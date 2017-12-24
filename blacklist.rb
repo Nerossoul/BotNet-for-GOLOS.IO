@@ -1,18 +1,14 @@
 require 'tiny_tds'
 require "json"
-
+require_relative 'stringformat.rb'
 
 class BlackList
 
-
     @@all_upvot50_50_posts = nil
-
-
-
 
   def self.get_all_user_votes(user_name)
     client = TinyTds::Client.new username: 'golos', password: 'golos', host: 'sql.golos.cloud', port: 1433, database: 'DBGolos'
-    print 'get_all_user_votes: Connecting to SQL Server'
+    print "Get_#{user_name.brown}_votes: Connecting to SQL Server"
     if client.active? == true then puts ' Done' end
     tsql = "SELECT author, permlink FROM TxVotes WHERE voter='#{user_name}'"
     result = client.execute(tsql)
@@ -26,7 +22,7 @@ class BlackList
 
   def self.get_all_upvot50_50_posts
   client = TinyTds::Client.new username: 'golos', password: 'golos', host: 'sql.golos.cloud', port: 1433, database: 'DBGolos'
-  print 'get_all_upvot50_50_posts: Connecting to SQL Server'
+  print 'Get_all_upvot50_50_posts: Connecting to SQL Server'
   if client.active? == true then puts ' Done' end
   query_done = false
   while query_done != true
@@ -49,7 +45,6 @@ class BlackList
 
   def self.get_voted_posts_upvote50_50(user_name)
     if @@all_upvot50_50_posts == nil
-      puts "работает УРА"
       @@all_upvot50_50_posts = get_all_upvot50_50_posts
     end
     all_upvot50_50_posts = @@all_upvot50_50_posts
@@ -69,7 +64,7 @@ class BlackList
 
   def self.get_all_user_transfers_memo(user_name)
     client = TinyTds::Client.new username: 'golos', password: 'golos', host: 'sql.golos.cloud', port: 1433, database: 'DBGolos'
-    print 'get_all_user_transfers : Connecting to SQL Server for '
+    print "Get_#{user_name.brown}_transfers : Connecting to SQL Server for "
     if client.active? == true then puts ' Done' end
     tsql = "SELECT memo FROM TxTransfers WHERE type = 'transfer' AND [to] = '#{user_name}' AND NOT [from] = 'robot' AND NOT [from] = 'golos.loto' "
     result = client.execute(tsql)
@@ -104,7 +99,7 @@ class BlackList
   end
 
   def self.get_post_paid_status(user_name)
-    puts "create stat for #{user_name}"
+    puts "Create stat for".green + " #{user_name.upcase}".brown
     post_paid_status = []
     voted_posts_upvote50_50 = get_voted_posts_upvote50_50(user_name)
     paid_posts = get_paid_posts(user_name)
@@ -143,62 +138,36 @@ class BlackList
         common_black_list << elem
       end
     end
+    save(common_black_list)
+    @@all_upvot50_50_posts = nil
     common_black_list
   end
 
   def self.save(common_black_list)
-    
+    current_path = File.dirname(__FILE__)
+    file_name = current_path + "/resources/blacklist.txt"
+    f = File.new(file_name, "w")
+    common_black_list.each do |black_list_string|
+      f.puts black_list_string
+    end
+    f.close
   end
 
   def self.open
-
+    black_list = []
+    current_path = File.dirname(__FILE__)
+    file_name = current_path + "/resources/blacklist.txt"
+    if File.exists?(file_name)
+          f= File.new(file_name, 'r:UTF-8')
+          lines = f.readlines
+          f.close
+          lines.each do |line|
+            black_list << line.strip
+          end
+          return black_list
+    else
+          return []
+    end
   end
 
 end #end of class BlackList
-
-puts BlackList.create_common_black_list(['upvot50-50', 'holly'])
-
-
-
-
-=begin
-def get_post_info_from_sql(author, permlink)
-  client = TinyTds::Client.new username: 'golos', password: 'golos', host: 'sql.golos.cloud', port: 1433, database: 'DBGolos'
-  puts 'Connecting to SQL Server'
-  if client.active? == true then puts 'Done' end
-  tsql = "SELECT * FROM TxComments WHERE author='#{author}' and permlink='#{permlink}'"
-  result = client.execute(tsql)
-  post_info = []
-  result.each do |row|
-      post_info << row
-  end
-  client.close
-  time_array = []
-  if post_info.size > 1
-    puts "много правок вытаскиваем последнюю"
-    post_info.each do |post_version|
-      time_array << post_version["timestamp"].to_datetime
-    end
-    post_info.each do |post_version|
-      if time_array.max == post_version["timestamp"].to_datetime
-      return [post_version]
-      end
-    end
-    puts "done"
-  end
-  post_info
-end
-
-def upvote50_50?(post_info)
-  if post_info[0]['parent_author'] == ''
-    if JSON.parse(post_info[0]["json_metadata"])["tags"] != nil
-      tags = JSON.parse(post_info[0]["json_metadata"])["tags"]
-    else
-      return false
-    end
-    tags.include? 'ru--apvot50-50'
-  else
-    return false
-  end
-end
-=end
