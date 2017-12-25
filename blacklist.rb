@@ -5,11 +5,12 @@ require_relative 'stringformat.rb'
 class BlackList
 
     @@all_upvot50_50_posts = nil
+    @@user_counter = 0
 
   def self.get_all_user_votes(user_name)
     client = TinyTds::Client.new username: 'golos', password: 'golos', host: 'sql.golos.cloud', port: 1433, database: 'DBGolos'
-    print "Get_#{user_name.brown}_votes: Connecting to SQL Server"
-    if client.active? == true then puts ' Done' end
+    print "Get_votes:"
+    if client.active? == true then print '->' end
     tsql = "SELECT author, permlink FROM TxVotes WHERE voter='#{user_name}'"
     result = client.execute(tsql)
     user_votes = []
@@ -17,13 +18,14 @@ class BlackList
         user_votes << row
     end
     client.close
+    print 'ok '.green
     user_votes
   end
 
   def self.get_all_upvot50_50_posts
   client = TinyTds::Client.new username: 'golos', password: 'golos', host: 'sql.golos.cloud', port: 1433, database: 'DBGolos'
-  print 'Get_all_upvot50_50_posts: Connecting to SQL Server'
-  if client.active? == true then puts ' Done' end
+  print 'Get_all_upvot50_50_posts:'
+  if client.active? == true then print '->' end
   query_done = false
   while query_done != true
     begin
@@ -40,6 +42,7 @@ class BlackList
     end
   end
   client.close
+  print 'ok '.green
   all_upvot50_50_posts
   end
 
@@ -64,8 +67,8 @@ class BlackList
 
   def self.get_all_user_transfers_memo(user_name)
     client = TinyTds::Client.new username: 'golos', password: 'golos', host: 'sql.golos.cloud', port: 1433, database: 'DBGolos'
-    print "Get_#{user_name.brown}_transfers : Connecting to SQL Server for "
-    if client.active? == true then puts ' Done' end
+    print "Get_transfers:"
+    if client.active? == true then print '->' end
     tsql = "SELECT memo FROM TxTransfers WHERE type = 'transfer' AND [to] = '#{user_name}' AND NOT [from] = 'robot' AND NOT [from] = 'golos.loto' "
     result = client.execute(tsql)
     transfers = []
@@ -73,6 +76,7 @@ class BlackList
       transfers << row
     end
     client.close
+    print 'ok '.green
     transfers
   end
 
@@ -99,7 +103,8 @@ class BlackList
   end
 
   def self.get_post_paid_status(user_name)
-    puts "Create stat for".green + " #{user_name.upcase}".brown
+    @@user_counter += 1
+    print "#{@@user_counter}. Create stat for".green + " #{user_name.upcase} ".brown
     post_paid_status = []
     voted_posts_upvote50_50 = get_voted_posts_upvote50_50(user_name)
     paid_posts = get_paid_posts(user_name)
@@ -128,6 +133,7 @@ class BlackList
       result_black_list << "#{user_name}/#{key}" if (((value[1].to_f)/(value[0].to_f))*100) > 70
       end
     end
+    puts 'DONE'.green.bold
     result_black_list
   end
 
@@ -140,6 +146,7 @@ class BlackList
     end
     save(common_black_list)
     @@all_upvot50_50_posts = nil
+    @@user_counter = 0
     common_black_list
   end
 
