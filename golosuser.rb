@@ -74,3 +74,26 @@ class GolosUser
     end
   end
 end
+
+=begin
+/home/nerossoul/.rvm/rubies/ruby-2.4.0/lib/ruby/2.4.0/net/http.rb:906:in `rescue in block in connect': Failed to open TCP connection to api.golos.cf:443 (Network is unreachable - connect(2) for "api.golos.cf" port 443) (Errno::ENETUNREACH)
+	from /home/nerossoul/.rvm/rubies/ruby-2.4.0/lib/ruby/2.4.0/net/http.rb:903:in `block in connect'
+	from /home/nerossoul/.rvm/rubies/ruby-2.4.0/lib/ruby/2.4.0/timeout.rb:93:in `block in timeout'
+	from /home/nerossoul/.rvm/rubies/ruby-2.4.0/lib/ruby/2.4.0/timeout.rb:103:in `timeout'
+	from /home/nerossoul/.rvm/rubies/ruby-2.4.0/lib/ruby/2.4.0/net/http.rb:902:in `connect'
+	from /home/nerossoul/.rvm/rubies/ruby-2.4.0/lib/ruby/2.4.0/net/http.rb:887:in `do_start'
+	from /home/nerossoul/.rvm/rubies/ruby-2.4.0/lib/ruby/2.4.0/net/http.rb:876:in `start'
+	from /home/nerossoul/.rvm/rubies/ruby-2.4.0/lib/ruby/2.4.0/net/http.rb:1407:in `request'
+	from /home/nerossoul/.rvm/gems/ruby-2.4.0/gems/radiator-0.3.15/lib/radiator/api.rb:624:in `request'
+	from /home/nerossoul/.rvm/gems/ruby-2.4.0/gems/radiator-0.3.15/lib/radiator/api.rb:446:in `block in method_missing'
+	from /home/nerossoul/.rvm/gems/ruby-2.4.0/gems/radiator-0.3.15/lib/radiator/api.rb:425:in `loop'
+	from /home/nerossoul/.rvm/gems/ruby-2.4.0/gems/radiator-0.3.15/lib/radiator/api.rb:425:in `method_missing'
+	from /home/nerossoul/botnet/golosuser.rb:71:in `get_steem_per_mvests'
+	from /home/nerossoul/botnet/golosuser.rb:50:in `get_user_info'
+	from /home/nerossoul/botnet/botnet.rb:585:in `block in vote_by_each_user_for_upvote_list'
+	from /home/nerossoul/botnet/botnet.rb:584:in `each'
+	from /home/nerossoul/botnet/botnet.rb:584:in `vote_by_each_user_for_upvote_list'
+	from upvote5050ver2.rb:26:in `block in <main>'
+	from upvote5050ver2.rb:16:in `loop'
+	from upvote5050ver2.rb:16:in `<main>'
+=end

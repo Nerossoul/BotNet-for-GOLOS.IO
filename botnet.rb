@@ -51,7 +51,7 @@ class BotNet
     lust_post_data = []
     max_number = get_account_history_max_number(user_name)
     limit_response = 1999
-    options = GOLOSOPTIONS.merge({url: NODES_URLS.sample})
+    options = GOLOSOPTIONS.merge({url: 'https://api.golos.cf'})
     api = Radiator::Api.new(options)
     while max_number > 0 do
       puts "Получаем данные последнего поста #{user_name.brown}"
@@ -128,12 +128,12 @@ class BotNet
         retry_count = retry_count + 1
         puts "\n\rWe 've got a ERROR MESSAGE NUMBER #{retry_count}'".red.reverse_color
         if response['error']['message'].include? DUPLICATE_TRANSACTION_ERROR
-          puts "ERROR: #{user.user_name}  trying duplicate transaction ► #{transaction_data}|Transaction ABORTED".red.reverse_color
+          puts "ERROR: #{user.user_name}  trying duplicate transaction ► #{transaction_data}|Transaction ABORTED".green.reverse_color
           sleep(4)
           transaction_signed = true
           user.signing_transaction_now = false
         elsif response['error']['message'].include? ALREDY_REBLOGGED_ERROR
-          puts "ERROR: #{user.user_name}  already reblogged this post ► #{transaction_data}|Transaction ABORTED".red.reverse_color
+          puts "ERROR: #{user.user_name}  already reblogged this post ► #{transaction_data}|Transaction ABORTED".green.reverse_color
           sleep(4)
           transaction_signed = true
           user.signing_transaction_now = false

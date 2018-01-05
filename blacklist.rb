@@ -129,7 +129,7 @@ class BlackList
       end
     end
     black_list.map do |key, value|
-      if value[0] > 2
+      if value[0] > 3
       result_black_list << "#{user_name}/#{key}" if (((value[1].to_f)/(value[0].to_f))*100) > 70
       end
     end

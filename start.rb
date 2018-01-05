@@ -7,7 +7,12 @@ require 'tiny_tds'
 
 
 
-botnet_commander = BotNet.new
+# Print 1 to 100 percent in place in the console using "dynamic output"
+# technique
+# Prints a combination of the progress bar, spinner, and percentage examples.
+# Prints a text-based progress bar representing 0 to 100 percent. Each "="
+# sign represents 5 percent.
+
 
 
 
