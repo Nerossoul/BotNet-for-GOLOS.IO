@@ -24,7 +24,7 @@ MAX_VOTING_POWER = 99.55
 
 GOOD_TAG_ARRAY = ['ru--apvot50-50']
 
-BAD_AUTHORS_APVOT5050 = ['vika30']
+BAD_AUTHORS_APVOT5050 = ['vika30', 'filipico', 'cvedmk']
 
 # error_texts
 DUPLICATE_TRANSACTION_ERROR = 'Duplicate transaction check failed'

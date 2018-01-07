@@ -195,7 +195,7 @@ class BotNet
     return vote
   end
 
-  def create_comment_data(parent_permlink, author, title, body, json_metadata, parent_author)
+  def self.create_comment_data(parent_permlink, author, title, body, json_metadata, parent_author)
     permlink = get_comment_permlink(parent_permlink)
     comment = {
       type: :comment,
@@ -210,7 +210,21 @@ class BotNet
     return comment
   end
 
-  def get_comment_permlink(parent_permlink)
+  def self.create_post_data(parent_permlink, author, permlink, title, body, json_metadata, parent_author)
+    post = {
+      type: :comment,
+      parent_permlink: parent_permlink,
+      author: author,
+      permlink: permlink,
+      title: title,
+      body: body,
+      json_metadata: json_metadata,
+      parent_author: parent_author
+    }
+    return post
+  end
+
+  def self.get_comment_permlink(parent_permlink)
     t = Time.now
     permlink = "re-" + parent_permlink + t.strftime("-%Y%m%dt%H%M%S%L") + SecureRandom.hex(1)
     return permlink
@@ -248,7 +262,7 @@ class BotNet
       Thread.new(user) do |user_of_this_thread|
         body = generate_golos_loto_ticket
         vote = create_vote_data(user_of_this_thread.user_name, parent_author, parent_permlink, 10000)
-        comment = create_comment_data(parent_permlink, user_of_this_thread.user_name, title, body, json_metadata, parent_author)
+        comment = BotNet.create_comment_data(parent_permlink, user_of_this_thread.user_name, title, body, json_metadata, parent_author)
         post_been_voted = false
         post_information[:active_votes].each do |elem|
           post_been_voted = true if user_of_this_thread.user_name == elem['voter']

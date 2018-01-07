@@ -43,7 +43,18 @@ class GolosUser
     print "    ►►Getting #{user_name.brown} info "
     options = GOLOSOPTIONS.merge({url: NODES_URLS.sample})
     api = Radiator::Api.new(options)
-    response = api.get_accounts([@user_name])
+    got_user_info = false
+    while got_user_info != true
+      begin
+        response = api.get_accounts([@user_name])
+        got_user_info = true
+      rescue Exception => e
+        puts "get_user_info ERROR".red
+        puts e # e.message.red
+        print e.backtrace.join("\n")
+        sleep(5)
+      end
+    end
     golos_power = response['result'][0]['vesting_shares'].split(' ')
     #puts response['result'][0]['name']
     @golos = response['result'][0]['balance']

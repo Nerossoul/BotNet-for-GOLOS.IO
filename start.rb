@@ -17,7 +17,7 @@ require 'tiny_tds'
 
 
 
-=begin
+
 client = TinyTds::Client.new username: 'golos', password: 'golos', host: 'sql.golos.cloud', port: 1433, database: 'DBGolos'
 puts 'Connecting to SQL Server'
 
@@ -25,7 +25,7 @@ if client.active? == true then puts 'Done' end
 
 
 
-tsql0 = "SELECT author, permlink FROM TxComments WHERE parent_author = '' AND json_metadata LIKE '%ru--apvot50-50%'"
+tsql0 = "SELECT TOP 3 * FROM TxComments WHERE parent_author = '' AND json_metadata LIKE '%ru--apvot50-50%'"
 
 tsql10 = "SELECT memo FROM TxTransfers WHERE type = 'transfer' AND [to] = 'nerossoul'"
 
@@ -48,10 +48,10 @@ tsql3 ="SELECT
 FROM
   INFORMATION_SCHEMA.COLUMNS
 WHERE
-  TABLE_NAME = 'TxTransfers'
+  TABLE_NAME = 'TxComments'
 ORDER BY
   ORDINAL_POSITION ASC;"
-result = client.execute(tsql10)
+result = client.execute(tsql0)
 
 result.each do |row|
     puts row
@@ -59,4 +59,3 @@ result.each do |row|
 end
 
 client.close
-=end
