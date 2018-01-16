@@ -19,9 +19,9 @@ loop do
   puts "Create_new_blacklist at #{Time.now}".cyan
   BlackList.create_common_black_list(botnet_user_names)
   puts "Black list created at #{Time.now}".cyan
-  1.upto(14400) do |i|
-    progress = "#" * (i/720) unless i < 720
-    printf("\rCombined: [%-20s] %d/14400sec %s", progress, i, spinner.next)
+  1.upto(21600) do |i|
+    progress = "#" * (i/1080) unless i < 1080
+    printf("\rCombined: [%-20s] %d/21600sec %s", progress, i, spinner.next)
     sleep(1)
   end
   puts

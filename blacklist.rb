@@ -17,11 +17,20 @@ class BlackList
     client = TinyTds::Client.new username: 'golos', password: 'golos', host: 'sql.golos.cloud', port: 1433, database: 'DBGolos'
     print "Get_votes:"
     if client.active? == true then print '->' end
-    tsql = "SELECT author, permlink FROM TxVotes WHERE voter='#{user_name}'" # поработать над уменьшением ответа убрать голосования за лото и доску почета
-    result = client.execute(tsql)
-    user_votes = []
-    result.each do |row|
-        user_votes << row
+    query_done = false
+    while query_done != true
+      begin
+        tsql = "SELECT author, permlink FROM TxVotes WHERE voter='#{user_name}' AND weight > 0 " # поработать над уменьшением ответа убрать голосования за лото и доску почета
+        result = client.execute(tsql)
+        user_votes = []
+        result.each do |row|
+            user_votes << row
+        end
+        query_done = true
+      rescue
+        print "."
+        sleep(1)
+      end
     end
     client.close
     print 'ok '.green
@@ -35,15 +44,15 @@ class BlackList
   print 'Get_all_upvot50_50_posts:'
   while query_done != true
     begin
-      tsql = "SELECT author, permlink FROM TxComments WHERE parent_author = '' AND json_metadata LIKE '%ru--apvot50-50%'"
+      tsql = "SELECT author, permlink FROM TxComments WHERE parent_author = '' AND json_metadata LIKE '%\"ru--apvot50-50\"%'"
       result = client.execute(tsql)
       all_upvot50_50_posts = []
       result.each do |row|
-          all_upvot50_50_posts << row
+        all_upvot50_50_posts << row
       end
       query_done = true
     rescue
-      print "error try again "
+      print "."
       sleep(1)
     end
   end
@@ -75,15 +84,24 @@ class BlackList
     client = TinyTds::Client.new username: 'golos', password: 'golos', host: 'sql.golos.cloud', port: 1433, database: 'DBGolos'
     print "Get_transfers:"
     if client.active? == true then print '->' end
-    tsql = "SELECT memo FROM TxTransfers WHERE type = 'transfer' AND [to] = '#{user_name}' AND NOT [from] = 'robot' AND NOT [from] = 'golos.loto'"
-    result = client.execute(tsql)
-    transfers = []
-    result.each do |row|
-      transfers << row
+    query_done = false
+    while query_done != true
+      begin
+        tsql = "SELECT memo FROM TxTransfers WHERE type = 'transfer' AND [to] = '#{user_name}' AND NOT [from] = 'robot' AND NOT [from] = 'golos.loto'"
+        result = client.execute(tsql)
+        transfers = []
+        result.each do |row|
+          transfers << row
+        end
+        query_done = true
+      rescue
+        print "."
+        sleep(1)
+      end
     end
-    client.close
-    print 'ok '.green
-    transfers
+  client.close
+  print 'ok '.green
+  transfers
   end
 
   def self.get_paid_posts(user_name)
@@ -136,7 +154,7 @@ class BlackList
     end
     black_list.map do |key, value|
       if value[0] > 3
-      result_black_list << "#{user_name}/#{key}" if (((value[1].to_f)/(value[0].to_f))*100) < 70
+      result_black_list << "#{user_name}/#{key}" if (((value[1].to_f)/(value[0].to_f))*100) < 80
       end
     end
     puts 'DONE'.green.bold
@@ -203,11 +221,20 @@ class BlackList
     client = TinyTds::Client.new username: 'golos', password: 'golos', host: 'sql.golos.cloud', port: 1433, database: 'DBGolos'
     print "get_last_post:"
     if client.active? == true then print '->' end
-    tsql = "SELECT TOP 1 author, permlink, timestamp FROM TxComments WHERE parent_author = '' AND author = '#{user_name}' ORDER BY id DESC"
-    result = client.execute(tsql)
-    last_post = []
-    result.each do |row|
-      last_post << row
+    query_done = false
+    while query_done != true
+      begin
+        tsql = "SELECT TOP 1 author, permlink, timestamp FROM TxComments WHERE parent_author = '' AND author = '#{user_name}' ORDER BY id DESC"
+        result = client.execute(tsql)
+        last_post = []
+        result.each do |row|
+          last_post << row
+        end
+        query_done = true
+      rescue
+        print "."
+        sleep(1)
+      end
     end
     client.close
     print 'ok '.green
@@ -219,11 +246,20 @@ class BlackList
     client = TinyTds::Client.new username: 'golos', password: 'golos', host: 'sql.golos.cloud', port: 1433, database: 'DBGolos'
     print "get_comments #{user_name.brown}/#{permlink.brown} "
     if client.active? == true then print '->' end
-    tsql = "SELECT author, permlink, body, timestamp FROM TxComments WHERE parent_author = '#{user_name}' AND parent_permlink = '#{permlink}'"
-    result = client.execute(tsql)
-    comments_array = []
-    result.each do |row|
-      comments_array << row
+    query_done = false
+    while query_done != true
+      begin
+        tsql = "SELECT author, permlink, body, timestamp FROM TxComments WHERE parent_author = '#{user_name}' AND parent_permlink = '#{permlink}'"
+        result = client.execute(tsql)
+        comments_array = []
+        result.each do |row|
+          comments_array << row
+        end
+        query_done = true
+      rescue
+        print "."
+        sleep(1)
+      end
     end
     client.close
     print 'ok '.green
@@ -261,7 +297,7 @@ class BlackList
       end
     end
     comments.each do |comment|
-      response_text = "\n#### Статистика для @#{comment['author']} \n | Автор | Upvoted, шт. | Оплаченных, шт. | Оплаченных, % | \n |---|---|---|---| \n"
+      response_text = "\n#### Статистика для @#{comment['author']} актуальна на #{(Time.now.utc + 3*60*60).strftime("%Y-%m-%d %H:%M:%S")}(МСК) \n | Автор | Upvoted, шт. | Оплаченных, шт. | Оплаченных, % | \n |---|---|---|---| \n"
       puts '*********************************'.blue
       if got_responce_authors.include? comment['author']
         print comment['author'].brown
@@ -279,7 +315,7 @@ class BlackList
         statistic_array.each do |stat_row|
           response_text = response_text + '|' + stat_row[0]+ '|' + stat_row[1].to_s+ '|' + stat_row[2].to_s+ '|' + stat_row[3].to_s + "|\n"
         end
-        response_text = response_text + "\n Спасибо вам **#{comment['author']}** за пользование нашим сервисом."
+        response_text = response_text + " Уважаемый(ая) #{comment['author']}, иногда авторам не удается указать ссылук на пост при оплате вознаграждения куратору. И сервис автору фиксирует **неоплату**. Прошу вас не заносить авторов в свой черный список только основываясь на данной статистике. Статистика создается для того, чтобы вам легче было определить каких авторов надо дополнительно перепроверить. Ещё раз повторю. **Невозможно сотавить 100% доставерную статистику автоматически, некоторые пункты требуют перепроверки живым человеком.** Прошу вас оставить обратную связь о полученных цифрах, таким образом мы можем сделать этот сервис умнее. \n Спасибо вам **#{comment['author']}** за пользование нашим сервисом."
         puts response_text
         puts "Create_response data"
         title = ''

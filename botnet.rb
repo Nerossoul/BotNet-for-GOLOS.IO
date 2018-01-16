@@ -435,7 +435,26 @@ class BotNet
     if block_data['result'] != nil
       block_data['result']["transactions"].each do |transaction|
         if (transaction['operations'][0][0] == 'comment') && (transaction['operations'][0][1]['parent_author'] == '')
-          tags = JSON.parse(transaction['operations'][0][1]["json_metadata"])["tags"]
+          puts
+          puts "meta data before json parse"
+          puts transaction['operations'][0][1]["json_metadata"]
+          puts transaction['operations'][0][1]["json_metadata"].class
+          if transaction['operations'][0][1]["json_metadata"].to_s == ''
+            puts 'no metadata'
+            tags = nil
+          else
+            tags = JSON.parse(transaction['operations'][0][1]["json_metadata"].to_s)['tags']
+          end
+          puts
+          puts "meta data AFTER json parse"
+          puts tags
+          if transaction['operations'][0][1]["json_metadata"] == '"{\"tags\":[\"nsfw\"]}"'
+            puts '{\"tags\":[\"nsfw\"]} blya'
+            tags = nil
+            puts "----"
+            puts tags
+            puts "----"
+          end
           if tags != nil
             tags.each do |tag|
               # puts "-->" + tag
@@ -610,15 +629,15 @@ class BotNet
           author_in_black_list = black_list_array.include? "#{user.user_name}/#{author}"
           active_votes.each { |elem| post_been_voted = true if user.user_name == elem['voter'] }
           if post_been_voted || author_in_black_list then
-            puts "\n\r#{user.user_name.upcase} already voted for @#{author}/#{permlink}".blue if post_been_voted
-            puts "\n\r#{author} is in #{user.user_name.upcase}\'s black list".cyan if author_in_black_list
+            #puts "\n\r#{user.user_name.upcase} already voted for @#{author}/#{permlink}".blue if post_been_voted
+            #puts "\n\r#{author} is in #{user.user_name.upcase}\'s black list".cyan if author_in_black_list
           else
             user_min_voting_power = MIN_VOTING_POWER - user.voiting_credit
             if user_min_voting_power < 83 then
               user_min_voting_power = 83
             end
-            puts "#{user.user_name}:user.future_voting_power = #{user.future_voting_power}, user_min_voting_power = #{user_min_voting_power.round(2)}".gray +
-            " (MIN_VOTING_POWER = #{MIN_VOTING_POWER}, user.voiting_credit = #{user.voiting_credit})".gray
+            #puts "#{user.user_name}:user.future_voting_power = #{user.future_voting_power}, user_min_voting_power = #{user_min_voting_power.round(2)}".gray +
+            # " (MIN_VOTING_POWER = #{MIN_VOTING_POWER}, user.voiting_credit = #{user.voiting_credit})".gray
             if (user.future_voting_power > user_min_voting_power)
               user.future_voting_power = user.future_voting_power - ((user.future_voting_power/100*0.5).round(2))
               puts "\n\r#{user.user_name.brown} Voting Power now #{user.actual_voting_power.to_s.green} ► #{user.future_voting_power.to_s.green}".reverse_color

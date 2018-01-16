@@ -25,7 +25,8 @@ end
 users = BotNet.read_users_data_from_file
 reblogger = GolosUser.new(users[105][:user_name], users[105][:post_key], '')
 users = nil
-delay_time = 8*60*60/3 #8 hours delay
+delay_time = 30*60/3 #    30 minutes delay
+#delay_time = 8*60*60/3 # 8 hours delay
 loop do
   puts
   min_block_number = BotNet.get_lust_max_block_number_from_file
