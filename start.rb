@@ -2,7 +2,7 @@
 require_relative 'botnet.rb'
 require_relative 'golosuser.rb'
 require_relative 'stringformat.rb'
-
+require_relative 'blacklist.rb'
 require 'tiny_tds'
 
 
@@ -15,9 +15,11 @@ require 'tiny_tds'
 
 #puts (Time.now.utc + 3*60*60).strftime("%Y-%m-%d %H:%M:%S")
 
+#puts BlackList.get_post_reward_time("upbank", "my-zapuskaemsya-mobi-dik-nachinaet-rabotu-segodnya")
 
-
-
+#BlackList.is_last_post_too_old?('upvot50-50')
+puts BlackList.get_post_paid_status('nerossoul')
+=begin
 client = TinyTds::Client.new username: 'golos', password: 'golos', host: 'sql.golos.cloud', port: 1433, database: 'DBGolos'
 puts 'Connecting to SQL Server'
 
@@ -39,7 +41,9 @@ tsql333 = "SELECT TOP 10 * FROM TxVotes WHERE voter='nerossoul' AND weight > 0  
 tsql444 = "SELECT TOP 3 * FROM TxComments WHERE parent_author = '' AND author = 'ieshua' AND permlink = 'konkurs-s-mega-prizom-ogromnyi-chernyi-brilliant-vesom-8-2-karat-vse-chestno'"
 # вывести поля таблицы
 
-tsql555 = "SELECT * FROM VOAuthorRewards WHERE author = 'ieshua' AND permlink = 'konkurs-s-mega-prizom-ogromnyi-chernyi-brilliant-vesom-8-2-karat-vse-chestno'"
+tsql555 = "SELECT TOP 1 * FROM VOAuthorRewards WHERE author = 'ieshua' AND permlink = 'konkurs-s-mega-prizom-ogromnyi-chernyi-brilliant-vesom-8-2-karat-vse-chestno'"
+
+tsql666 = "SELECT TOP 10 author, permlink, timestamp FROM TxVotes WHERE voter='nerossoul' AND weight > 0 "
 
 tsql3 ="SELECT
    ORDINAL_POSITION
@@ -54,7 +58,7 @@ WHERE
   TABLE_NAME = 'VOAuthorRewards'
 ORDER BY
   ORDINAL_POSITION ASC;"
-result = client.execute(tsql555)
+result = client.execute(tsql666)
 
 #2017-09-12 17:36:57 +0700
 #2017-09-14 02:29:03 +0700
@@ -65,3 +69,7 @@ result.each do |row|
 end
 
 client.close
+
+
+#BotNet.get_time_object_from_golos_timestamp(last_post['timestamp'].to_datetime.to_s)
+=end

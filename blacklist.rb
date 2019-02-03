@@ -20,7 +20,7 @@ class BlackList
     query_done = false
     while query_done != true
       begin
-        tsql = "SELECT author, permlink FROM TxVotes WHERE voter='#{user_name}' AND weight > 0 " # поработать над уменьшением ответа убрать голосования за лото и доску почета
+        tsql = "SELECT author, permlink, timestamp FROM TxVotes WHERE voter='#{user_name}' AND weight > 0 " # поработать над уменьшением ответа убрать голосования за лото и доску почета
         result = client.execute(tsql)
         user_votes = []
         result.each do |row|
@@ -58,12 +58,13 @@ class BlackList
   end
   client.close
   print 'ok '.green
-  all_upvot50_50_posts
+  all_upvot50_50_posts.uniq!
   end
+
 
   def self.get_voted_posts_upvote50_50(user_name)
     if @@all_upvot50_50_posts == nil
-      @@all_upvot50_50_posts = get_all_upvot50_50_posts
+      @@all_upvot50_50_posts = get_all_upvot50_50_posts_from_file
     end
     all_upvot50_50_posts = @@all_upvot50_50_posts
     all_upvot50_50_posts.uniq!
@@ -72,8 +73,15 @@ class BlackList
     result = []
     all_upvot50_50_posts.each do |post|
       all_user_votes.each do |vote|
-        if post == vote
-          result << post
+        if post['author'] == vote['author'] &&  post['permlink'] == vote['permlink']
+
+          post_reward_time =  BotNet.get_time_object_from_golos_timestamp(DateTime.parse(post['timestamp']).to_s)
+          vote_time =  BotNet.get_time_object_from_golos_timestamp(vote['timestamp'].to_datetime.to_s)
+          #print "post time #{post_reward_time} --> vote time #{vote_time}"
+          if vote_time < post_reward_time
+            #puts "ad this upvote".green
+            result << post
+          end
         end
       end
     end
@@ -87,9 +95,10 @@ class BlackList
     query_done = false
     while query_done != true
       begin
-        tsql = "SELECT memo FROM TxTransfers WHERE type = 'transfer' AND [to] = '#{user_name}' AND NOT [from] = 'robot' AND NOT [from] = 'golos.loto'"
-        result = client.execute(tsql)
         transfers = []
+        tsql = "SELECT [from], memo FROM TxTransfers WHERE type = 'transfer' AND [to] = '#{user_name}' AND NOT [from] = 'robot' AND NOT [from] = 'golos.loto'"
+        result = client.execute(tsql)
+        sleep(1)
         result.each do |row|
           transfers << row
         end
@@ -104,6 +113,7 @@ class BlackList
   transfers
   end
 
+# old -> version 1.01 new method if --> self.get_transfers_without_link_and_paid_posts(user_name)
   def self.get_paid_posts(user_name)
     trasnfers = get_all_user_transfers_memo(user_name)
     all_paid_posts = []
@@ -126,6 +136,36 @@ class BlackList
     all_paid_posts
   end
 
+
+  def self.get_transfers_without_link_and_paid_posts(user_name)
+    trasnfers = get_all_user_transfers_memo(user_name)
+    all_paid_posts = []
+    transfers_without_link = {}
+    trasnfers.each do |transfer|
+      if transfer['memo'].include? '@'
+        split_memo = transfer['memo'].split('@')
+        split_memo.size.times do |i|
+          if i != 0
+            post = split_memo[i].split('/')
+            post_author = post[0]
+            post_permlink = post[1]
+            if !(post_author.include? ' ') && (post_permlink != nil)
+              post_permlink = post_permlink.split(' ')[0]
+              all_paid_posts << {"author"=>post_author, "permlink"=>post_permlink.split(' ')[0]}
+            else
+              if transfers_without_link[transfer['from']] == nil #here will be bug hash massive need here
+                transfers_without_link[transfer['from']] = 1
+              else
+                transfers_without_link[transfer['from']] += 1
+              end
+            end
+          end
+        end
+      end
+    end
+    [all_paid_posts, transfers_without_link]
+  end
+
   def self.get_post_paid_status(user_name)
     @@user_counter += 1
     print "#{@@user_counter}. Create stat for".green + " #{user_name.upcase} ".brown
@@ -133,7 +173,8 @@ class BlackList
     voted_posts_upvote50_50 = get_voted_posts_upvote50_50(user_name)
     paid_posts = get_paid_posts(user_name)
       voted_posts_upvote50_50.each do |voted_post|
-        post_paid_status << {"author"=>voted_post["author"], "permlink"=>voted_post["permlink"], "paid" => (paid_posts.include? voted_post)}
+        compare_variable = {"author"=>voted_post["author"], "permlink"=>voted_post["permlink"]}
+        post_paid_status << {"author"=>voted_post["author"], "permlink"=>voted_post["permlink"], "paid" => (paid_posts.include? compare_variable)} #bug need format voted post
       end
     post_paid_status
   end
@@ -351,6 +392,8 @@ class BlackList
 
   def self.is_last_post_too_old?(user_name)
     last_post = get_last_post(user_name)[0]
+    puts last_post['timestamp']
+    puts last_post['timestamp'].class
     post_time = BotNet.get_time_object_from_golos_timestamp(last_post['timestamp'].to_datetime.to_s)
     post_days_old = (Time.now.utc - post_time)/60/60/24
     if post_days_old > 1
@@ -359,5 +402,91 @@ class BlackList
       return false
     end
   end
+
+  def self.get_post_reward_time(author, prmlink)
+    client = TinyTds::Client.new username: 'golos', password: 'golos', host: 'sql.golos.cloud', port: 1433, database: 'DBGolos'
+    print "get_post_reward_time @#{author}/#{prmlink}:"
+    if client.active? == true then print '->' end
+    query_done = false
+    while query_done != true
+      begin
+        tsql = "SELECT TOP 1 timestamp FROM VOAuthorRewards WHERE author = '#{author}' AND permlink = '#{prmlink}'"
+        result = client.execute(tsql)
+        post_reward_time = []
+        result.each do |row|
+          post_reward_time << row
+        end
+        query_done = true
+      rescue
+        print "."
+        sleep(1)
+      end
+    end
+    client.close
+    print 'ok '.green
+    puts
+    if post_reward_time.size != 0
+      return post_reward_time[0]['timestamp']
+    else
+      return false
+    end
+  end
+
+  def self.get_all_upvot50_50_posts_from_file
+    all_upvot50_50_posts = []
+    current_path = File.dirname(__FILE__)
+    file_name = current_path + "/resources/allupvot5050posts.txt"
+    if File.exists?(file_name)
+          f= File.new(file_name, 'r:UTF-8')
+          lines = f.readlines
+          f.close
+          lines.each do |line|
+            line_array = line.split('/')
+            if line_array.size > 2
+              all_upvot50_50_posts << {"author"=>line_array[0], "permlink"=>line_array[1], "timestamp"=>line_array[2].strip}
+            end
+          end
+          return all_upvot50_50_posts#.uniq!
+    else
+          return []
+    end
+  end
+
+  def self.save_all_upvot50_50_posts_to_file
+    all_upvot50_50_posts_from_file = get_all_upvot50_50_posts_from_file
+    all_upvot50_50_posts = get_all_upvot50_50_posts
+    all_upvot50_50_posts_result = []
+    counter = 0
+    counter_goal = all_upvot50_50_posts.size
+    #puts all_upvot50_50_posts_from_file
+    all_upvot50_50_posts.each do |sql_post|
+      counter += 1
+      puts "#{counter}/#{counter_goal}"
+      post_found_in_file = false
+      all_upvot50_50_posts_from_file.each do |file_post|
+        if sql_post['author'] == file_post['author'] && sql_post['permlink'] == file_post['permlink']
+          all_upvot50_50_posts_result << file_post
+          post_found_in_file = true
+        end
+      end
+      if post_found_in_file == false
+        post_reward_time = get_post_reward_time(sql_post['author'], sql_post['permlink'])
+        puts "#{sql_post['author']}/#{sql_post['permlink']}/#{post_reward_time.to_s.green}"
+        if post_reward_time != false
+          all_upvot50_50_posts_result << {"author"=>sql_post['author'], "permlink"=>sql_post['permlink'], "timestamp"=>post_reward_time}
+        end
+      end
+    end
+    current_path = File.dirname(__FILE__)
+    file_name = current_path + "/resources/allupvot5050posts.txt"
+    f = File.new(file_name, "w")
+    all_upvot50_50_posts_result.uniq!
+    all_upvot50_50_posts_result.each do |post|
+      f.puts "#{post['author']}/#{post['permlink']}/#{post['timestamp']}"
+    end
+    f.close
+  end
+
+
 
 end #end of class BlackList

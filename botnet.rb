@@ -456,22 +456,26 @@ class BotNet
             puts "----"
           end
           if tags != nil
-            tags.each do |tag|
-              # puts "-->" + tag
-              if good_tag_array.include?(tag)
-                # puts "timestamp: #{block_data["result"]["timestamp"]}"
-                # puts transaction['operations'][0][0]
-                # puts transaction['operations'][0][1]['parent_author']
-                # puts transaction['operations'][0][1]['author']
-                # puts transaction['operations'][0][1]['permlink']
-                # puts tags
-                # puts "*************************"
-                posts_by_tag << { 'author' => transaction['operations'][0][1]['author'],
-                                  'permlink' => transaction['operations'][0][1]['permlink'],
-                                  'timestamp' => block_data['result']['timestamp'] }
-                break
-              end # if
-            end # tags.each
+            begin
+              tags.each do |tag|
+                # puts "-->" + tag
+                if good_tag_array.include?(tag)
+                  # puts "timestamp: #{block_data["result"]["timestamp"]}"
+                  # puts transaction['operations'][0][0]
+                  # puts transaction['operations'][0][1]['parent_author']
+                  # puts transaction['operations'][0][1]['author']
+                  # puts transaction['operations'][0][1]['permlink']
+                  # puts tags
+                  # puts "*************************"
+                  posts_by_tag << { 'author' => transaction['operations'][0][1]['author'],
+                                    'permlink' => transaction['operations'][0][1]['permlink'],
+                                    'timestamp' => block_data['result']['timestamp'] }
+                  break
+                end # if
+              end # tags.each
+            rescue
+              puts "error metadata"
+            end
           end # if tags != nil
         end # if
       end # block_data_operations.each
@@ -622,42 +626,46 @@ class BotNet
       puts "\n\r************************"
       puts "\n\rUpvoting for #{post[:pending_payout_value].to_s.green} => #{post[:author].brown}/#{post[:permlink].brown}".reverse_color
       @users.each do |user|
-        BotNet.get_permission_to_run_thead
-        Thread::abort_on_exception = true
-        Thread.new(user, post[:author], post[:permlink], post[:active_votes]) do |user, author, permlink, active_votes|
-          post_been_voted = false
-          author_in_black_list = black_list_array.include? "#{user.user_name}/#{author}"
-          active_votes.each { |elem| post_been_voted = true if user.user_name == elem['voter'] }
-          if post_been_voted || author_in_black_list then
-            #puts "\n\r#{user.user_name.upcase} already voted for @#{author}/#{permlink}".blue if post_been_voted
-            #puts "\n\r#{author} is in #{user.user_name.upcase}\'s black list".cyan if author_in_black_list
-          else
-            user_min_voting_power = MIN_VOTING_POWER - user.voiting_credit
-            if user_min_voting_power < 83 then
-              user_min_voting_power = 83
+        if NOT_VOTE_UPVOT50_50_LIST.include? user.user_name
+          puts "ПРОПУСКАЕМ @#{user.user_name} ---------------------->".green
+        else
+          BotNet.get_permission_to_run_thead
+          Thread::abort_on_exception = true
+          Thread.new(user, post[:author], post[:permlink], post[:active_votes]) do |user, author, permlink, active_votes|
+            post_been_voted = false
+            author_in_black_list = black_list_array.include? "#{user.user_name}/#{author}"
+            active_votes.each { |elem| post_been_voted = true if user.user_name == elem['voter'] }
+            if post_been_voted || author_in_black_list then
+              #puts "\n\r#{user.user_name.upcase} already voted for @#{author}/#{permlink}".blue if post_been_voted
+              #puts "\n\r#{author} is in #{user.user_name.upcase}\'s black list".cyan if author_in_black_list
+            else
+              user_min_voting_power = MIN_VOTING_POWER - user.voiting_credit
+              if user_min_voting_power < 83 then
+                user_min_voting_power = 83
+              end
+              #puts "#{user.user_name}:user.future_voting_power = #{user.future_voting_power}, user_min_voting_power = #{user_min_voting_power.round(2)}".gray +
+              # " (MIN_VOTING_POWER = #{MIN_VOTING_POWER}, user.voiting_credit = #{user.voiting_credit})".gray
+              if (user.future_voting_power > user_min_voting_power)
+                user.future_voting_power = user.future_voting_power - ((user.future_voting_power/100*0.5).round(2))
+                puts "\n\r#{user.user_name.brown} Voting Power now #{user.actual_voting_power.to_s.green} ► #{user.future_voting_power.to_s.green}".reverse_color
+                vote = create_vote_data(user.user_name, author, permlink, 10000)
+                # puts "\n\r#{user.user_name.brown} vote for @#{author}/#{permlink}."
+                BotNet.sign_transaction(vote, user.post_key, user)
+              end
             end
-            #puts "#{user.user_name}:user.future_voting_power = #{user.future_voting_power}, user_min_voting_power = #{user_min_voting_power.round(2)}".gray +
-            # " (MIN_VOTING_POWER = #{MIN_VOTING_POWER}, user.voiting_credit = #{user.voiting_credit})".gray
-            if (user.future_voting_power > user_min_voting_power)
-              user.future_voting_power = user.future_voting_power - ((user.future_voting_power/100*0.5).round(2))
-              puts "\n\r#{user.user_name.brown} Voting Power now #{user.actual_voting_power.to_s.green} ► #{user.future_voting_power.to_s.green}".reverse_color
-              vote = create_vote_data(user.user_name, author, permlink, 10000)
-              # puts "\n\r#{user.user_name.brown} vote for @#{author}/#{permlink}."
-              BotNet.sign_transaction(vote, user.post_key, user)
-            end
-          end
-        end # end of Thread
+          end # end of Thread
+        end # end of NOT_VOTE_UPVOT50_50_LIST.include? user.user_name
       end # end users.each
     users_with_minimum_voting_power = 0
     @users.each do |user|
       user_min_voting_power = MIN_VOTING_POWER - user.voiting_credit
-      if user_min_voting_power < 83 then
-        user_min_voting_power = 83
+      if user_min_voting_power < 98.5 then
+        user_min_voting_power = 98.5
       end
       users_with_minimum_voting_power += 1 if user.future_voting_power <= user_min_voting_power
     end
     puts "Users_with_minimum_voting_power = #{users_with_minimum_voting_power}/#{@users.size}".cyan
-    if @users.size == users_with_minimum_voting_power
+    if @users.size == users_with_minimum_voting_power # todo учесть пользователей которых мы пропускам NOT_VOTE_UPVOT50_50_LIST
       puts "Each user reach minimum voting power!".green.reverse_color
       break
     end
